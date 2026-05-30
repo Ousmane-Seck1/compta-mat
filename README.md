@@ -27,6 +27,44 @@ Le projet inclut maintenant une application web Django, plus adaptee a la gestio
 - Python 3.14+
 - dependances installees via `pip install -r requirements.txt`
 
+## Installation locale
+
+Windows (PowerShell):
+
+```bash
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+macOS/Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Variables d'environnement (optionnel en dev):
+
+- `DJANGO_DEBUG` (True/False)
+- `DJANGO_SECRET_KEY` (obligatoire si DEBUG=False)
+- `DJANGO_ALLOWED_HOSTS` (liste separee par des virgules)
+
+Exemples PowerShell:
+
+```bash
+$env:DJANGO_DEBUG="True"
+$env:DJANGO_ALLOWED_HOSTS="127.0.0.1,localhost"
+```
+
+Exemples Bash:
+
+```bash
+export DJANGO_DEBUG=True
+export DJANGO_ALLOWED_HOSTS="127.0.0.1,localhost"
+```
+
 ## Lancement de l'application web
 
 ```bash
@@ -36,6 +74,17 @@ python manage.py runserver
 ```
 
 L'application est ensuite accessible sur `http://127.0.0.1:8000`.
+
+## Deploiement (essentiel)
+
+- definir `DJANGO_DEBUG=False`
+- definir `DJANGO_SECRET_KEY` (obligatoire en production)
+- definir `DJANGO_ALLOWED_HOSTS`
+- collecter les statiques:
+
+```bash
+python manage.py collectstatic
+```
 
 ## Verification qualite rapide
 
@@ -82,6 +131,11 @@ python manage.py purge_document_security_logs --days 90
 
 - chaque bon dispose d'une page detail imprimable
 - l'impression utilise un gabarit HTML/CSS A4, sans dependance externe
+
+## Documents et medias
+
+- Les modeles officiels sont dans `compta_web/media/documents/`.
+- Les rapports generes (PDF/XLSX) sont stockes dans `compta_web/media/quarterly_reports/` et sont ignores par Git.
 
 ## Structure principale
 
