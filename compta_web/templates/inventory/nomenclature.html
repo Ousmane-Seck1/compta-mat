@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Nomenclature des comptes (Administration){% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>Nomenclature des comptes</h2>
+        <a class="button menu-primary" href="{% url 'screen_admin' %}">Retour Ecran 1</a>
+    </div>
+    <p>Référentiel global des comptes de matières. Tout ajout ou suppression est répercuté dans la comptabilité de toutes les structures et exercices ouverts.</p>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <!-- Sync button -->
+    <form method="post" style="margin-bottom:1rem;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="sync">
+        <button class="button menu-secondary" type="submit" onclick="return confirm('Propager toute la nomenclature vers tous les services et exercices ouverts ?')">
+            Synchroniser vers tous les services
+        </button>
+    </form>
+
+    <!-- Search form -->
+    <form method="get" class="inline-form no-print">
+        <div>
+            <label for="nom_q">Recherche</label>
+            <input id="nom_q" type="text" name="q" value="{{ q }}" placeholder="Code, nom ou groupe">
+        </div>
+        <button class="button" type="submit">Filtrer</button>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Compte</th>
+                <th>Intitulé</th>
+                <th>Unité</th>
+                <th>Groupe</th>
+                <th class="no-print">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.account_code }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.unit }}</td>
+                <td>{{ item.group_code }}</td>
+                <td class="no-print">
+                    <form method="post" style="display:inline;" onsubmit="return confirm('Supprimer le compte {{ item.account_code }} de la nomenclature et de tous les services ?')">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="account_code" value="{{ item.account_code }}">
+                        <button class="button" style="background:#9c2f2f;color:#fff;padding:0.2rem 0.6rem;" type="submit">Supprimer</button>
+                    </form>
+                    <form method="get" style="display:inline;">
+                        <input type="hidden" name="edit" value="{{ item.account_code }}">
+                        <button class="button" style="background:#2f6c9c;color:#fff;padding:0.2rem 0.6rem;" type="submit">Modifier</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">Aucun compte enregistré.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if items.paginator.num_pages > 1 %}
+    <div class="pagination no-print">
+        {% if items.has_previous %}
+        <a class="button secondary" href="?{% if q %}q={{ q }}&{% endif %}page={{ items.previous_page_number }}">Precedent</a>
+        {% endif %}
+        <span>Page {{ items.number }} / {{ items.paginator.num_pages }}</span>
+        {% if items.has_next %}
+        <a class="button secondary" href="?{% if q %}q={{ q }}&{% endif %}page={{ items.next_page_number }}">Suivant</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+
+<section class="panel narrow">
+    {% if edit_item %}
+        <h2>Modifier le compte</h2>
+        <p style="font-size:0.9em;color:#666;">La modification sera automatiquement répercutée dans la comptabilité de toutes les structures et exercices ouverts.</p>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="account_code" value="{{ edit_item.account_code }}">
+            {{ form.as_p }}
+            <button class="button" type="submit">Enregistrer les modifications</button>
+            <a class="button menu-secondary" href="?{% if q %}q={{ q }}{% endif %}">Annuler</a>
+        </form>
+    {% else %}
+        <h2>Ajouter un compte</h2>
+        <p style="font-size:0.9em;color:#666;">L'ajout sera automatiquement répercuté dans la comptabilité de toutes les structures et exercices ouverts.</p>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add">
+            {{ form.as_p }}
+            <button class="button" type="submit">Enregistrer le compte</button>
+        </form>
+    {% endif %}
+</section>
+{% endblock %}

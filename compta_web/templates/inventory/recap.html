@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% load inventory_filters %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>Relevé récapitulatif</h2>
+        <div class="print-actions no-print">
+            <button type="button" class="button secondary" onclick="window.print()">Imprimer</button>
+            <a class="button secondary" href="{% url 'recap_pdf' %}">PDF</a>
+            <a class="button secondary" href="{% url 'recap_excel' %}">Excel</a>
+            <a class="button secondary" href="{% url 'pv_recensement' %}">Ouvrir le PV de recensement</a>
+        </div>
+    </div>
+
+    {% if report_form %}
+    <div class="no-print" style="margin-top: 0.8rem; display: flex; gap: 0.6rem; align-items: flex-end; flex-wrap: wrap;">
+        <form method="post" action="{% url 'quarterly_report_create' %}" style="display: flex; gap: 0.6rem; align-items: flex-end; flex-wrap: wrap;">
+            {% csrf_token %}
+            <div>
+                <label for="quarter">Trimestre</label>
+                <select id="quarter" name="quarter">
+                    {% for value, label in report_form.fields.quarter.choices %}
+                    <option value="{{ value }}" {% if report_form.initial.quarter|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="quarter_name">Nom du rapport</label>
+                <input id="quarter_name" name="name" type="text" value="{{ report_form.initial.name }}" required>
+            </div>
+            <button class="button" type="submit">Enregistrer rapport trimestriel</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="official-header" style="margin-bottom: 0.9rem;">
+        <div>
+            {% if print_logo_url %}
+            <div style="margin-bottom: 0.4rem;">
+                <img src="{{ print_logo_url }}" alt="Logo" style="max-height: 58px; width: auto;">
+            </div>
+            {% endif %}
+            <strong>{{ country }}</strong><br>
+            {{ ministry }}<br>
+            {{ structure_label }} {{ structure_value }}<br>
+            {% if address %}Adresse : {{ address }}<br>{% endif %}
+            {% if phone %}Téléphone : {{ phone }}<br>{% endif %}
+            {% if email %}Email : {{ email }}{% endif %}
+        </div>
+        <div class="official-meta">
+            <div>Modèle 20</div>
+            <div>Année fiscale: {{ fiscal_year }}</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Compte</th>
+                <th>Matières</th>
+                <th>Existant en début de gestion</th>
+                <th>Entrée en cours de gestion</th>
+                <th>Qté sortie</th>
+                <th>Total</th>
+                <th>Matières en attente d'affectation</th>
+                <th>Matières en service</th>
+                <th>Matières en sortie provisoire</th>
+                <th>Total</th>
+                <th>Montant stock</th>
+                <th>CMUP</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in summary %}
+            <tr>
+                <td>{{ row.account_code }}</td>
+                <td>{{ row.name }}</td>
+                <td>{{ row.qty_in_opening|fmt_qty }}</td>
+                <td>{{ row.qty_in_period|fmt_qty }}</td>
+                <td>{{ row.qty_out|fmt_qty }}</td>
+                <td>{{ row.remaining_qty|fmt_qty }}</td>
+                <td>{{ row.pending_qty|fmt_qty }}</td>
+                <td>{{ row.in_service_qty|fmt_qty }}</td>
+                <td>{{ row.provisional_qty|fmt_qty }}</td>
+                <td>{{ row.remaining_qty|fmt_qty }}</td>
+                <td>{{ row.remaining_amount|fmt_amount }}</td>
+                <td>{{ row.cmup|fmt_amount }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="12">Aucune donnée disponible.</td></tr>
+            {% endfor %}
+        </tbody>
+        {% if summary %}
+        <tfoot>
+            <tr style="font-weight: bold; border-top: 2px solid #333;">
+                <td colspan="2">TOTAL</td>
+                <td>{{ totals.qty_in_opening|fmt_qty }}</td>
+                <td>{{ totals.qty_in_period|fmt_qty }}</td>
+                <td>{{ totals.qty_out|fmt_qty }}</td>
+                <td>{{ totals.remaining_qty|fmt_qty }}</td>
+                <td>{{ totals.pending_qty|fmt_qty }}</td>
+                <td>{{ totals.in_service_qty|fmt_qty }}</td>
+                <td>{{ totals.provisional_qty|fmt_qty }}</td>
+                <td>{{ totals.remaining_qty|fmt_qty }}</td>
+                <td>{{ totals.remaining_amount|fmt_amount }}</td>
+                <td>—</td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</section>
+
+{% if quarterly_reports %}
+<section class="panel no-print">
+    <div class="panel-head">
+        <h3>Rapports trimestriels sauvegardes</h3>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Trimestre</th>
+                <th>Nom</th>
+                <th>Date</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for report in quarterly_reports %}
+            <tr>
+                <td>T{{ report.quarter }}</td>
+                <td>{{ report.name }}</td>
+                <td>{{ report.created_at|date:"d/m/Y" }}</td>
+                <td>
+                    <a class="button secondary" href="{% url 'quarterly_report_pdf' report.id %}">PDF</a>
+                    <a class="button secondary" href="{% url 'quarterly_report_excel' report.id %}">Excel</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+<section class="panel" style="font-size: 0.85rem; line-height: 1.45;">
+    <p style="margin-bottom: 0.6rem;"><strong>NB :</strong></p>
+    <ol style="margin: 0 0 1rem 1.1rem; padding: 0;">
+        <li>Il est établi en fin de gestion et lors de l'arrêté des écritures.</li>
+        <li>Dans l'ordre des comptes de la nomenclature.</li>
+        <li>Reporter l'existant du grand-livre.</li>
+        <li>Sommation des quantités de chaque article à partir des fiches d'inventaire individuel contradictoire des matières.</li>
+        <li><strong>Sortie provisoire (colonne « Matières en sortie provisoire ») :</strong> cette colonne n'est pas prise en compte dans le calcul de la quantité restante en stock, car les sorties provisoires ne modifient pas le stock comptable. Elle est utilisée à titre informatif pour le suivi des matières temporairement sorties en attente de retour.</li>
+    </ol>
+
+    <p style="margin-top: 1rem;">
+        <strong>Signature du Comptable des matières :</strong>
+    </p>
+    <div style="height: 2.2rem; border-bottom: 1px solid #999; max-width: 360px;"></div>
+</section>
+{% endblock %}

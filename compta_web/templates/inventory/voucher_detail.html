@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% load inventory_filters %}
+
+{% block content %}
+<section class="panel print-sheet">
+    <div class="print-actions no-print">
+        <button class="button" onclick="window.print()">Imprimer le bon</button>
+        <a class="button secondary" href="{% url 'voucher_list' %}">Retour</a>
+    </div>
+
+    <div class="official-header">
+        <div>
+            {% if print_logo_url %}
+            <div style="margin-bottom: 0.4rem;">
+                <img src="{{ print_logo_url }}" alt="Logo" style="max-height: 58px; width: auto;">
+            </div>
+            {% endif %}
+            <strong>{{ country }}</strong><br>
+            {{ ministry }}<br>
+            {{ structure_label }} {{ structure_value }}<br>
+            {% if address %}Adresse : {{ address }}<br>{% endif %}
+            {% if phone %}Téléphone : {{ phone }}<br>{% endif %}
+            {% if email %}Email : {{ email }}{% endif %}
+        </div>
+        <div class="official-meta">
+            <div>Modèle No 2 / 3</div>
+            <div>Année fiscale: {{ fiscal_year }}</div>
+        </div>
+    </div>
+
+    <h2 class="official-title">{{ voucher.get_voucher_type_display|upper }} No {{ voucher.number }}</h2>
+
+    <div class="voucher-meta-grid">
+        <div><strong>Date:</strong> {{ voucher.operation_date }}</div>
+        <div><strong>Origine / destination:</strong> {{ voucher.source_or_destination }}</div>
+        <div><strong>Localisation (magasin):</strong> {{ voucher.storage_location.name|default:'-' }}</div>
+        <div><strong>Saisi par:</strong> {{ voucher.created_by|default:'-' }}</div>
+    </div>
+
+    <table class="official-table">
+        <thead>
+            <tr>
+                <th>N° compte</th>
+                <th>Nature des matières</th>
+                <th>Spécification</th>
+                <th>Quantité</th>
+                <th>Unité</th>
+                <th>Prix unitaire</th>
+                <th>Montant</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line in voucher.lines.all %}
+            <tr>
+                <td>{{ line.material.account_code }}</td>
+                <td>{{ line.material_name }}</td>
+                <td>{{ line.specification }}</td>
+                <td>{{ line.quantity|fmt_qty }}</td>
+                <td>{{ line.unit }}</td>
+                <td>{{ line.unit_price|fmt_amount }}</td>
+                <td>{{ line.amount|fmt_amount }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3">Total</td>
+                <td>{{ total_quantity|fmt_qty }}</td>
+                <td></td>
+                <td></td>
+                <td>{{ total_amount|fmt_amount }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    {% if voucher.voucher_type == 'entree' %}
+    <div style="margin-top: 2rem; padding: 1rem; border: 1px solid var(--border); border-radius: 12px; background: rgba(255, 253, 248, 0.5);">
+        <p style="margin: 0 0 1rem;">
+            <strong>Déclaration du comptable:</strong>
+        </p>
+        <p style="margin: 0; line-height: 1.8;">
+            Le comptable des matières, soussigné, déclare ce jour, augmenter ses prises en charge de <strong>{{ total_quantity|fmt_qty }} unités ({{ total_quantity_words }})</strong> représentant une valeur de <strong>{{ total_amount|fmt_amount }} Francs ({{ total_amount_words }})</strong>.
+        </p>
+    </div>
+    {% elif voucher.voucher_type == 'sortie_definitive' %}
+    <div style="margin-top: 2rem; padding: 1rem; border: 1px solid var(--border); border-radius: 12px; background: rgba(255, 253, 248, 0.5);">
+        <p style="margin: 0 0 1rem;">
+            <strong>Déclaration du comptable:</strong>
+        </p>
+        <p style="margin: 0; line-height: 1.8;">
+            Le comptable des matières, soussigné, déclare ce jour, diminuer ses prises en charge de <strong>{{ total_quantity|fmt_qty }} unités ({{ total_quantity_words }})</strong> représentant une valeur de <strong>{{ total_amount|fmt_amount }} Francs ({{ total_amount_words }})</strong>.
+        </p>
+    </div>
+    {% elif voucher.voucher_type == 'sortie_provisoire' %}
+    <div style="margin-top: 2rem; padding: 1rem; border: 1px solid var(--border); border-radius: 12px; background: rgba(255, 253, 248, 0.5);">
+        <p style="margin: 0 0 1rem;">
+            <strong>Engagement du comptable:</strong>
+        </p>
+        <p style="margin: 0; line-height: 1.8;">
+            Le comptable des matières, soussigné, s'engage à faire diligence pour réintégrer les matières portées au présent bon dans l'enceinte du service.
+        </p>
+
+        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border);">
+            <p style="margin: 0 0 0.5rem; line-height: 1.8;">
+                <strong>Statut retour:</strong>
+                {% if voucher.temp_return_status == 'retourne' %}
+                    <span class="badge" style="background: #116149; color: #fff;">Retourne</span>
+                    {% if voucher.temp_return_date %}le {{ voucher.temp_return_date|date:"d/m/Y" }}{% endif %}
+                {% else %}
+                    <span class="badge" style="background: #9c2f2f; color: #fff;">En cours</span>
+                {% endif %}
+            </p>
+            {% if voucher.temp_return_note %}
+            <p style="margin: 0 0 0.6rem; line-height: 1.6;"><strong>Observation:</strong> {{ voucher.temp_return_note }}</p>
+            {% endif %}
+
+            {% if can_update_temp_return %}
+            <form method="post" class="no-print" style="margin-top: 0.6rem; display: grid; gap: 0.6rem; max-width: 540px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_temp_return_status">
+
+                <div>
+                    <label for="temp_return_status"><strong>Mise a jour du statut</strong></label>
+                    <select id="temp_return_status" name="temp_return_status" class="form-control" required>
+                        <option value="en_cours" {% if voucher.temp_return_status == 'en_cours' %}selected{% endif %}>En cours</option>
+                        <option value="retourne" {% if voucher.temp_return_status == 'retourne' %}selected{% endif %}>Retourne</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="temp_return_date"><strong>Date de retour</strong></label>
+                    <input id="temp_return_date" type="date" name="temp_return_date" class="form-control" value="{% if voucher.temp_return_date %}{{ voucher.temp_return_date|date:'Y-m-d' }}{% endif %}">
+                    <small>Obligatoire si statut = Retourne.</small>
+                </div>
+
+                <div>
+                    <label for="temp_return_note"><strong>Observation</strong></label>
+                    <input id="temp_return_note" type="text" name="temp_return_note" class="form-control" maxlength="255" value="{{ voucher.temp_return_note }}" placeholder="Ex: Retourne le 12/05/2026 apres reparation">
+                </div>
+
+                <div>
+                    <button type="submit" class="button">Enregistrer statut retour</button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="signature-grid" style="margin-top: 2rem;">
+        {% if voucher.voucher_type == 'entree' %}
+        <div>
+            <strong>Ordonnateur des matières</strong>
+            <div class="signature-box"></div>
+        </div>
+        <div>
+            <strong>Comptable des matières</strong>
+            <div class="signature-box"></div>
+        </div>
+        {% else %}
+        <div>
+            <strong>Ordonnateur des matières</strong>
+            <div class="signature-box"></div>
+        </div>
+        <div>
+            <strong>Comptable des matières</strong>
+            <div class="signature-box"></div>
+        </div>
+        <div>
+            <strong>Réceptionnaire</strong>
+            <div class="signature-box"></div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

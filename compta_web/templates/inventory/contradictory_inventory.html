@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load inventory_filters %}
+
+{% block title %}Fiche d'inventaire individuel contradictoire{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head no-print">
+        <div>
+            <h2>Fiche d'inventaire individuel contradictoire</h2>
+            <p class="screen-desc">Liste annuelle des matières détenues par une localisation (magasins et localisations en service).</p>
+        </div>
+        <div class="screen-links">
+            <a class="button secondary" href="{% url 'screen_internal_movements' %}">Écran 3</a>
+            {% if selected_location %}
+            <a class="button secondary" href="{% url 'contradictory_inventory_pdf' %}?location_id={{ selected_location.id }}">Imprimer PDF</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="get" class="form-shell no-print" style="margin-bottom: 1rem;">
+        <label for="location_id"><strong>Localisation</strong></label>
+        <select name="location_id" id="location_id" onchange="this.form.submit()">
+            {% for location in locations %}
+            <option value="{{ location.id }}" {% if selected_location and selected_location.id == location.id %}selected{% endif %}>{{ location.name }}</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    {% if selected_location %}
+    <div style="text-align: center; margin-bottom: 1rem;">
+        <h3 style="margin-bottom: 0.25rem;">Fiche d'inventaire individuel contradictoire</h3>
+        <p style="margin: 0;">Service: {{ current_structure.name }} | Exercice: {{ current_fiscal_year.year }}</p>
+        <p style="margin: 0.25rem 0 0;">Localisation: <strong>{{ selected_location.name }}</strong> | Responsable: {{ selected_location.responsible_name|default:"-" }}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>N° nomenclature</th>
+                <th>Désignation</th>
+                <th>Code d'immatriculation</th>
+                <th>Quantité</th>
+                <th>Unité</th>
+                <th>PU</th>
+                <th>Montant</th>
+                <th>Dernier mouvement</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.account_code }}</td>
+                <td>{{ row.material_name }}</td>
+                <td>{{ row.inventory_code|default:"-" }}</td>
+                <td>{{ row.quantity|fmt_qty }}</td>
+                <td>{{ row.unit }}</td>
+                <td>{{ row.unit_price|fmt_amount }}</td>
+                <td>{{ row.amount|fmt_amount }}</td>
+                <td>{% if row.last_movement_date %}{{ row.last_movement_date|date:"d/m/Y" }}{% else %}-{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8">Aucune matière en service trouvée pour cette localisation sur l'exercice courant.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3"><strong>Total quantites</strong></td>
+                <td><strong>{{ total_quantity|fmt_qty }}</strong></td>
+                <td><strong>-</strong></td>
+                <td><strong>-</strong></td>
+                <td><strong>{{ total_amount|fmt_amount }}</strong></td>
+                <td><strong>-</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+        <div>
+            <p><strong>Le responsable de la localisation</strong></p>
+            <p>{{ selected_location.responsible_name|default:"................................" }}</p>
+        </div>
+        <div>
+            <p><strong>Le comptable des matières</strong></p>
+            <p>{{ comptable_name }}</p>
+        </div>
+    </div>
+    {% else %}
+    <p>Aucune localisation en service n'est encore disponible pour éditer la fiche.</p>
+    {% endif %}
+</section>
+{% endblock %}

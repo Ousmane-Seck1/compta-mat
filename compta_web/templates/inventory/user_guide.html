@@ -1,0 +1,1078 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Guide d'utilisation - Comptabilité des Matières{% endblock %}
+
+{% block content %}
+<style>
+    /* ── Guide-specific styles & print optimisation ── */
+    .guide-container { max-width: 960px; margin: 0 auto; }
+
+    .guide-cover { text-align: center; padding: 2rem 1rem; }
+    .guide-cover h1 { font-size: 2rem; margin: 0.5rem 0; letter-spacing: 0.06em; }
+    .guide-cover .subtitle { color: var(--muted); font-size: 1.1rem; margin: 0.5rem 0; }
+
+    .guide-toc { columns: 2; column-gap: 2rem; }
+    .guide-toc a { display: block; padding: 0.3rem 0; border-bottom: 1px dotted var(--border); }
+    .guide-toc a:hover { color: var(--accent); }
+
+    .guide-section { page-break-inside: avoid; }
+    .guide-section h2 { color: var(--accent); border-bottom: 2px solid var(--accent-soft); padding-bottom: 0.3rem; margin-top: 0; }
+    .guide-section h3 { color: var(--ink); margin-top: 1rem; }
+
+    .guide-table { width: 100%; border-collapse: collapse; margin: 0.8rem 0; font-size: 0.92rem; }
+    .guide-table th, .guide-table td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: left; }
+    .guide-table th { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
+    .guide-table tr:nth-child(even) td { background: rgba(215,185,140,0.10); }
+
+    .guide-tip { background: linear-gradient(145deg, #f9f3e8, #f0e4cf); border-left: 4px solid var(--accent); padding: 0.7rem 1rem; border-radius: 0 12px 12px 0; margin: 0.8rem 0; }
+    .guide-tip strong { color: var(--accent); }
+
+    .guide-warning { background: #fef3f2; border-left: 4px solid var(--error); padding: 0.7rem 1rem; border-radius: 0 12px 12px 0; margin: 0.8rem 0; }
+    .guide-warning strong { color: var(--error); }
+
+    .guide-step { display: flex; gap: 0.8rem; margin: 0.6rem 0; align-items: flex-start; }
+    .guide-step-num { flex-shrink: 0; width: 28px; height: 28px; background: var(--accent); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; }
+    .guide-step-text { flex: 1; }
+
+    .guide-kbd { display: inline-block; background: #f4efe6; border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.4rem; font-family: monospace; font-size: 0.88rem; }
+
+    .guide-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0.8rem 0; }
+    .guide-flow-item { background: linear-gradient(145deg, #fffaf3, #f3e4cb); border: 1px solid var(--border); border-radius: 10px; padding: 0.4rem 0.8rem; font-size: 0.9rem; }
+    .guide-flow-arrow { font-size: 1.2rem; color: var(--accent); }
+
+    @media print {
+        .guide-no-print { display: none !important; }
+        .guide-container { max-width: 100%; }
+        .guide-section { page-break-inside: avoid; }
+        .guide-cover { page-break-after: always; }
+        .guide-toc-panel { page-break-after: always; }
+
+        .panel { border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0.5rem 0 !important; background: white !important; }
+        .guide-table th { background: #e8e0d4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .guide-tip, .guide-warning { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+</style>
+
+<!-- ═══════════════════════════════════════════════════════
+     TOOLBAR (hidden on print)
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-no-print">
+    <div class="panel-head">
+        <h2 style="margin:0;">Guide d'utilisation</h2>
+        <div class="screen-links">
+            <button class="button menu-primary" onclick="window.print()">🖨️ Imprimer / PDF</button>
+            <a class="button menu-secondary" href="{% url 'menu' %}">Retour accueil</a>
+            {% if guide_source == 'screen1' and user.profile.role == 'admin' %}
+            <a class="button menu-secondary" href="{% url 'screen_admin' %}">Retour Ecran 1</a>
+            {% endif %}
+            {% if guide_source == 'screen2' %}
+            <a class="button menu-secondary" href="{% url 'screen_operations' %}">Retour Ecran 2</a>
+            {% endif %}
+            {% if guide_source == 'screen3' %}
+            <a class="button menu-secondary" href="{% url 'screen_internal_movements' %}">Retour Ecran 3</a>
+            {% endif %}
+            {% if guide_source == 'screen4' %}
+            <a class="button menu-secondary" href="{% url 'screen_documents' %}">Retour Ecran 4</a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<div class="guide-container">
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE DE COUVERTURE
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-cover guide-section">
+    <img src="{% static 'inventory/logo_gem.png' %}" alt="Logo GeM" style="height: 100px; width: auto; margin-bottom: 0.5rem;">
+    <h1>GUIDE D'UTILISATION</h1>
+    <p class="subtitle">Application de Comptabilité des Matières</p>
+    <hr style="border:none; border-top: 2px solid var(--accent-soft); width: 60%; margin: 1.2rem auto;">
+    <p style="font-size: 1rem; color: var(--muted);">
+        Logiciel de gestion des matières — Suivi des entrées, sorties,<br>
+        inventaire physique, régularisations et clôture d'exercice.
+    </p>
+    <p style="margin-top: 1.5rem; color: var(--muted); font-size: 0.9rem;">Version du guide : Mai 2026</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     TABLE DES MATIÈRES
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-toc-panel guide-section">
+    <h2 style="color: var(--accent); border-bottom: 2px solid var(--accent-soft); padding-bottom: 0.3rem;">Table des matières</h2>
+    <div class="guide-toc">
+        <a href="#chap1">1. Présentation générale</a>
+        <a href="#chap2">2. Connexion et navigation</a>
+        <a href="#chap3">3. Rôles et droits d'accès</a>
+        <a href="#chap4">4. Écran 1 — Administration</a>
+        <a href="#chap5">5. Écran 2 — Opérations comptables</a>
+        <a href="#chap6">6. Saisie des bons</a>
+        <a href="#chap7">7. Consultation — Livre-journal</a>
+        <a href="#chap8">8. Consultation — Grand livre</a>
+        <a href="#chap9">9. Relevé récapitulatif</a>
+        <a href="#chap10">10. PV de recensement</a>
+        <a href="#chap11">11. Rapport final de gestion</a>
+        <a href="#chap12">12. Clôture et report d'exercice</a>
+        <a href="#chap13">13. Écran 3 — Mouvements internes</a>
+        <a href="#chap14">14. Écran 4 — Modèles de documents</a>
+        <a href="#chap15">15. Tableau de bord qualité</a>
+        <a href="#chap16">16. Rapport central (Admin)</a>
+        <a href="#chap17">17. Impression et export PDF/Excel</a>
+        <a href="#chap18">18. Glossaire</a>
+        <a href="#chap19">19. Questions fréquentes (FAQ)</a>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 1 — PRÉSENTATION GÉNÉRALE
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap1">
+    <h2>1. Présentation générale</h2>
+    <p>
+        L'application <strong>Comptabilité des Matières</strong> est un logiciel de gestion destiné aux structures publiques.
+        Elle permet de tenir la comptabilité des matières conformément à la réglementation en vigueur, en assurant :
+    </p>
+    <ul>
+        <li>Le suivi des <strong>entrées</strong> (réceptions de matières) et des <strong>sorties</strong> (consommation ou mise en service).</li>
+        <li>La tenue du <strong>Livre-journal</strong> et du <strong>Grand livre</strong> par compte de matières.</li>
+        <li>L'établissement du <strong>Relevé récapitulatif</strong> (balance des comptes).</li>
+        <li>La réalisation du <strong>PV de recensement</strong> (inventaire physique annuel).</li>
+        <li>La production du <strong>Rapport final de gestion</strong> avec certificat administratif.</li>
+        <li>La <strong>clôture d'exercice</strong> et le report automatique des soldes vers l'exercice suivant.</li>
+    </ul>
+
+    <h3>Architecture multi-structure</h3>
+    <p>
+        L'application gère <strong>plusieurs structures</strong> (services, hôpitaux, directions…) de manière indépendante.
+        Chaque structure possède ses propres exercices fiscaux, matières, bons et rapports.
+        Un administrateur central peut consulter un <strong>rapport consolidé</strong> de l'ensemble des structures.
+    </p>
+
+    <div class="guide-tip">
+        <strong>💡 Astuce :</strong> Chaque structure a sa propre numérotation de bons, sa nomenclature de matières et son calendrier d'exercice.
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 2 — CONNEXION ET NAVIGATION
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap2">
+    <h2>2. Connexion et navigation</h2>
+
+    <h3>2.1 Se connecter</h3>
+    <div class="guide-step">
+        <span class="guide-step-num">1</span>
+        <div class="guide-step-text">Ouvrez l'application dans votre navigateur web.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">2</span>
+        <div class="guide-step-text">Saisissez votre <strong>nom d'utilisateur</strong> et votre <strong>mot de passe</strong>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">3</span>
+        <div class="guide-step-text">Cliquez sur <span class="guide-kbd">Se connecter</span>. L'application sélectionne automatiquement votre structure et exercice par défaut.</div>
+    </div>
+
+    <h3>2.2 L'écran d'accueil</h3>
+    <p>Après connexion, l'écran d'accueil affiche quatre boutons principaux :</p>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Bouton</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><strong>Écran 1 — Administration</strong></td><td>Configuration du service, gestion des utilisateurs, nomenclature, paramètres.</td></tr>
+            <tr><td><strong>Écran 2 — Opérations</strong></td><td>Saisie des bons, consultation des journaux, relevés, PV et rapports.</td></tr>
+            <tr><td><strong>Écran 3 — Mouvements internes</strong></td><td>Localisations, bordereaux d'affectation/mutation/désaffectation et inventaire individuel contradictoire.</td></tr>
+            <tr><td><strong>Écran 4 — Modèles de documents</strong></td><td>Téléchargement des modèles officiels de formulaires.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>2.3 La barre de navigation</h3>
+    <p>
+        En haut de chaque page, la barre affiche :
+    </p>
+    <ul>
+        <li>Le <strong>logo</strong> de l'application et de la structure active.</li>
+        <li>Votre <strong>nom d'utilisateur</strong> avec un lien vers votre <strong>Profil</strong> et le bouton <strong>Déconnexion</strong>.</li>
+        <li>L'indication de l'<strong>écran courant</strong> (Écran 1, 2, 3 ou 4), avec des liens rapides vers l'accueil et le menu de l'écran.</li>
+        <li>Le <strong>code de la structure</strong> et l'<strong>année de l'exercice</strong> actifs.</li>
+    </ul>
+
+    <h3>2.4 Changer de structure ou d'exercice</h3>
+    <div class="guide-step">
+        <span class="guide-step-num">1</span>
+        <div class="guide-step-text">Cliquez sur <span class="guide-kbd">Service / Exercice</span> dans la barre de navigation.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">2</span>
+        <div class="guide-step-text">Sélectionnez la <strong>structure</strong> souhaitée dans la liste déroulante (les administrateurs voient toutes les structures actives ; les autres utilisateurs voient uniquement leurs structures assignées).</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">3</span>
+        <div class="guide-step-text">Sélectionnez l'<strong>exercice fiscal</strong> correspondant.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">4</span>
+        <div class="guide-step-text">Cliquez sur <span class="guide-kbd">Valider</span>. La page redirige vers le tableau de bord de la structure choisie.</div>
+    </div>
+
+    <div class="guide-tip">
+        <strong>💡 Astuce :</strong> La structure et l'exercice restent mémorisés dans votre session tant que vous ne les changez pas ou ne vous déconnectez pas.
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 3 — RÔLES ET DROITS D'ACCÈS
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap3">
+    <h2>3. Rôles et droits d'accès</h2>
+    <p>L'application gère trois profils d'utilisateurs avec des niveaux de permissions distincts :</p>
+
+    <table class="guide-table">
+        <thead>
+            <tr><th>Rôle</th><th>Accès</th><th>Actions autorisées</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Administrateur</strong></td>
+                <td>Toutes les structures</td>
+                <td>
+                    Toutes les opérations : gestion des utilisateurs, nomenclature, paramètres, saisie des bons,
+                    rapports, clôture d'exercice, rapport central consolidé.
+                </td>
+            </tr>
+            <tr>
+                <td><strong>Comptable</strong></td>
+                <td>Structures assignées uniquement</td>
+                <td>
+                    Saisie des bons d'entrée et de sortie, remplissage du PV de recensement,
+                    consultation de tous les rapports, modification de son profil.
+                </td>
+            </tr>
+            <tr>
+                <td><strong>Consultation</strong></td>
+                <td>Structures assignées uniquement</td>
+                <td>
+                    Consultation en lecture seule : tableau de bord, journal, grand livre, relevés, rapports.
+                    Aucune saisie ni modification.
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="guide-warning">
+        <strong>⚠️ Important :</strong> Seul l'administrateur peut créer des utilisateurs, modifier les droits d'accès, gérer la nomenclature et accéder au rapport central.
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 4 — ÉCRAN 1 : ADMINISTRATION
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap4">
+    <h2>4. Écran 1 — Administration</h2>
+    <p>Cet écran regroupe toutes les fonctions de configuration et de pilotage.</p>
+
+    <h3>4.1 Sélection Service / Exercice</h3>
+    <p>Première étape obligatoire : choisir la structure et l'exercice sur lesquels travailler. Voir la section <a href="#chap2">2.4</a> pour les détails.</p>
+
+    <h3>4.2 Paramètres du service</h3>
+    <p>Permet de configurer les informations d'en-tête qui apparaissent sur les documents officiels :</p>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Champ</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Pays</td><td>Nom du pays (affiché en en-tête des documents imprimés).</td></tr>
+            <tr><td>Ministère</td><td>Ministère de tutelle.</td></tr>
+            <tr><td>Adresse</td><td>Adresse postale du service.</td></tr>
+            <tr><td>Téléphone</td><td>Numéro de téléphone de contact.</td></tr>
+            <tr><td>Email</td><td>Adresse email du service.</td></tr>
+            <tr><td>Logo</td><td>Image du logo de la structure (affiché en haut à droite).</td></tr>
+        </tbody>
+    </table>
+
+    <h3>4.3 Gestion des utilisateurs (Admin uniquement)</h3>
+    <p>L'administrateur peut créer, modifier et supprimer des comptes utilisateurs.</p>
+
+    <h4>Créer un utilisateur</h4>
+    <div class="guide-step">
+        <span class="guide-step-num">1</span>
+        <div class="guide-step-text">Accédez à <strong>Écran 1 → Gestion des utilisateurs</strong>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">2</span>
+        <div class="guide-step-text">Cliquez sur <span class="guide-kbd">Nouvel utilisateur</span>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">3</span>
+        <div class="guide-step-text">Remplissez le formulaire : nom d'utilisateur, mot de passe, rôle (<em>admin</em>, <em>comptable</em> ou <em>consultation</em>).</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">4</span>
+        <div class="guide-step-text">Assignez une ou plusieurs <strong>structures</strong> à l'utilisateur, puis définissez sa <strong>structure par défaut</strong>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">5</span>
+        <div class="guide-step-text">Cliquez sur <span class="guide-kbd">Enregistrer</span>.</div>
+    </div>
+
+    <h4>Modifier ou supprimer un utilisateur</h4>
+    <p>
+        Sur la liste des utilisateurs, cliquez sur <span class="guide-kbd">Modifier</span> pour ajuster le rôle ou les structures,
+        ou sur <span class="guide-kbd">Supprimer</span> pour retirer un compte.
+    </p>
+
+    <h3>4.4 Nomenclature des comptes (Admin uniquement)</h3>
+    <p>
+        La nomenclature est le <strong>référentiel central</strong> des comptes de matières (codes, libellés, unités, groupes).
+        Elle sert de base à la création des matières dans chaque structure.
+    </p>
+
+    <h4>Ajouter un élément de nomenclature</h4>
+    <div class="guide-step">
+        <span class="guide-step-num">1</span>
+        <div class="guide-step-text">Accédez à <strong>Écran 1 → Nomenclature</strong>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">2</span>
+        <div class="guide-step-text">Remplissez les champs : <strong>Code</strong>, <strong>Nom</strong>, <strong>Unité</strong>, <strong>Groupe</strong>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">3</span>
+        <div class="guide-step-text">Cliquez sur <span class="guide-kbd">Ajouter</span>. L'élément est créé dans la nomenclature globale.</div>
+    </div>
+
+    <h4>Propager vers les structures</h4>
+    <p>
+        Utilisez le bouton <span class="guide-kbd">Synchroniser</span> pour propager automatiquement les éléments de nomenclature
+        vers toutes les structures actives. Cela crée les matières correspondantes dans chaque structure pour l'exercice actif.
+    </p>
+
+    <div class="guide-tip">
+        <strong>💡 Astuce :</strong> Lorsque vous ajoutez un nouvel élément de nomenclature, il est automatiquement propagé
+        vers toutes les structures actives. La synchronisation n'est nécessaire que pour rattraper des écarts.
+    </div>
+
+    <h3>4.5 Journaux de sécurité documents</h3>
+    <p>
+        Cette section affiche l'historique des tentatives de téléversement de documents rejetées
+        (extension non autorisée, taille dépassée, type MIME invalide, etc.).
+        Filtrez par utilisateur, adresse IP ou date. L'administrateur peut purger les anciens journaux.
+    </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 5 — ÉCRAN 2 : OPÉRATIONS COMPTABLES
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap5">
+    <h2>5. Écran 2 — Opérations comptables</h2>
+    <p>Cet écran est le cœur de l'activité quotidienne. Il donne accès à toutes les fonctions de saisie et de consultation :</p>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Fonction</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Tableau de bord</td><td>Vue d'ensemble des indicateurs qualité et des stocks.</td></tr>
+            <tr><td>Nouveau bon</td><td>Saisie d'un bon d'entrée, de sortie définitive ou provisoire.</td></tr>
+            <tr><td>Liste des bons</td><td>Recherche et consultation de tous les bons existants.</td></tr>
+            <tr><td>Livre-journal</td><td>Journal chronologique de toutes les écritures.</td></tr>
+            <tr><td>Grand livre</td><td>Historique détaillé par compte de matière.</td></tr>
+            <tr><td>Relevé récapitulatif</td><td>Balance ventilée entre existant en début de gestion (Bon N°1), entrées en cours de gestion, sorties et soldes par matière.</td></tr>
+            <tr><td>Matières</td><td>Liste des comptes de matières de la structure.</td></tr>
+            <tr><td>PV de recensement</td><td>Saisie et consultation de l'inventaire physique.</td></tr>
+            <tr><td>Rapport final</td><td>Rapport de fin de gestion avec régularisations.</td></tr>
+            <tr><td>Clôture / Report</td><td>Clôture de l'exercice et création de l'exercice suivant.</td></tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 6 — SAISIE DES BONS
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap6">
+    <h2>6. Saisie des bons</h2>
+
+    <h3>6.1 Types de bons</h3>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Type</th><th>Code</th><th>Description</th><th>Effet sur le stock</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Bon d'entrée</td><td>Entrée</td><td>Réception de matières (achat, don, transfert entrant).</td><td>↑ Augmente le stock</td></tr>
+            <tr><td>Bon de sortie définitive</td><td>Sortie définitive</td><td>Consommation, cession ou perte irréversible.</td><td>↓ Diminue le stock</td></tr>
+            <tr><td>Bon de sortie provisoire</td><td>Sortie provisoire</td><td>Prêt ou mise à disposition temporaire.</td><td>↕ Stock tracé séparément</td></tr>
+        </tbody>
+    </table>
+
+    <h3>6.2 Créer un bon — Procédure pas à pas</h3>
+    <div class="guide-step">
+        <span class="guide-step-num">1</span>
+        <div class="guide-step-text">Accédez à <strong>Écran 2 → Nouveau bon</strong>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">2</span>
+        <div class="guide-step-text">Sélectionnez le <strong>type de bon</strong> (Entrée, Sortie définitive, Sortie provisoire).</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">3</span>
+        <div class="guide-step-text">Renseignez la <strong>date</strong> du bon et l'<strong>origine / destination</strong> (fournisseur, service demandeur…).</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">4</span>
+        <div class="guide-step-text">Ajoutez un éventuel <strong>commentaire</strong> (référence de commande, motif…).</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">5</span>
+        <div class="guide-step-text">
+            <strong>Ajoutez les lignes de matières</strong> (minimum 3 lignes sont affichées) :
+            <ul>
+                <li>Sélectionnez le <strong>compte de matière</strong> dans la liste déroulante.</li>
+                <li>Saisissez la <strong>quantité</strong>.</li>
+                <li>Pour un bon d'entrée : saisissez le <strong>prix unitaire</strong></li>
+                <li>Pour une sortie : le prix unitaire est calculé automatiquement au <strong>CMUP</strong> (Coût Moyen Unitaire Pondéré).</li>
+            </ul>
+        </div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">6</span>
+        <div class="guide-step-text">Cliquez sur <span class="guide-kbd">Enregistrer le bon</span>. Le bon reçoit automatiquement un <strong>numéro séquentiel</strong>.</div>
+    </div>
+
+    <div class="guide-warning">
+        <strong>⚠️ Attention :</strong> Pour les bons de sortie, la quantité demandée ne peut pas dépasser le <strong>stock disponible</strong>.
+        L'application bloque la saisie dans ce cas et affiche un message d'erreur.
+    </div>
+
+    <div class="guide-tip">
+        <strong>💡 CMUP :</strong> Le Coût Moyen Unitaire Pondéré est calculé automatiquement :
+        <br><em>CMUP = Montant total des entrées ÷ (Quantité totale entrée − Quantité totale sortie)</em>
+        <br>Il est utilisé pour valoriser toutes les sorties. Vous n'avez pas besoin de le saisir manuellement.
+    </div>
+
+    <h3>6.3 Consulter et imprimer un bon</h3>
+    <div class="guide-step">
+        <span class="guide-step-num">1</span>
+        <div class="guide-step-text">Accédez à <strong>Écran 2 → Liste des bons</strong>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">2</span>
+        <div class="guide-step-text">Utilisez les <strong>filtres</strong> (type, date, recherche textuelle) pour trouver le bon souhaité.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">3</span>
+        <div class="guide-step-text">Cliquez sur le <strong>numéro du bon</strong> pour accéder à sa fiche détaillée.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">4</span>
+        <div class="guide-step-text">La fiche affiche le bon au format officiel (Modèle 2 ou 3), prêt à être <strong>imprimé</strong> via <span class="guide-kbd">Ctrl+P</span> ou le bouton d'impression.</div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 7 — LIVRE-JOURNAL
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap7">
+    <h2>7. Consultation — Livre-journal</h2>
+    <p>
+        Le <strong>Livre-journal</strong> affiche la liste chronologique de toutes les écritures comptables
+        de la structure pour l'exercice en cours.
+    </p>
+    <p>Chaque ligne affiche :</p>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Colonne</th><th>Contenu</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Date</td><td>Date de l'opération.</td></tr>
+            <tr><td>N° Bon</td><td>Numéro séquentiel du bon.</td></tr>
+            <tr><td>Type</td><td>Entrée, Sortie définitive ou Sortie provisoire.</td></tr>
+            <tr><td>Code</td><td>Code du compte de matière.</td></tr>
+            <tr><td>Désignation</td><td>Nom de la matière.</td></tr>
+            <tr><td>Quantité</td><td>Quantité mouvementée.</td></tr>
+            <tr><td>Prix unitaire</td><td>Prix unitaire (saisi ou CMUP).</td></tr>
+            <tr><td>Montant</td><td>Quantité × Prix unitaire.</td></tr>
+        </tbody>
+    </table>
+    <p>Les écritures sont séparées en <strong>Entrées</strong> et <strong>Sorties</strong> pour une lecture claire.</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 8 — GRAND LIVRE
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap8">
+    <h2>8. Consultation — Grand livre</h2>
+    <p>
+        Le <strong>Grand livre</strong> présente l'historique détaillé d'un <strong>compte de matière spécifique</strong>.
+    </p>
+    <div class="guide-step">
+        <span class="guide-step-num">1</span>
+        <div class="guide-step-text">Accédez à <strong>Écran 2 → Grand livre</strong>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">2</span>
+        <div class="guide-step-text">Sélectionnez un <strong>compte de matière</strong> dans la liste déroulante.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">3</span>
+        <div class="guide-step-text">Le tableau affiche chaque mouvement avec le <strong>solde cumulé</strong> (quantité et montant) après chaque opération.</div>
+    </div>
+    <p>
+        Ce document est essentiel pour vérifier la cohérence des mouvements d'un compte et retrouver
+        l'origine de tout écart.
+    </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 9 — RELEVÉ RÉCAPITULATIF
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap9">
+    <h2>9. Relevé récapitulatif</h2>
+    <p>
+        Le <strong>Relevé récapitulatif</strong> (Modèle 20) est la balance des comptes de matières.
+        Il résume, pour chaque matière :
+    </p>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Colonne</th><th>Contenu</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Existant en début de gestion</td><td>Quantité et montant issus du <strong>Bon N°1</strong> (balance d'entrée reportée de l'exercice précédent).</td></tr>
+            <tr><td>Entrée en cours de gestion</td><td>Quantité et montant des entrées effectuées pendant l'exercice (tous les bons d'entrée sauf le Bon N°1).</td></tr>
+            <tr><td>Total Sorties</td><td>Quantité et montant total des sorties définitives.</td></tr>
+            <tr><td>Reste en stock</td><td>Quantité et montant restant (Entrées − Sorties).</td></tr>
+            <tr><td>CMUP</td><td>Coût moyen unitaire pondéré actuel.</td></tr>
+        </tbody>
+    </table>
+    <div class="guide-warning">
+        <strong>⚠️ Bon N°1 :</strong> Le premier bon d'entrée de chaque exercice (Bon N°1) est toujours la <strong>balance d'entrée</strong>.
+        Il est automatiquement généré lors du report d'exercice et reprend les soldes de clôture de l'exercice précédent.
+        Ses quantités apparaissent dans la colonne « Existant en début de gestion », tandis que toutes les autres entrées
+        (achats, dons, transferts…) apparaissent dans « Entrée en cours de gestion ».
+    </div>
+    <p>Une ligne de <strong>TOTAUX</strong> en bas du tableau récapitule l'ensemble.</p>
+
+    <h3>Exporter</h3>
+    <ul>
+        <li><span class="guide-kbd">PDF (Modèle 20)</span> — Document formaté pour impression officielle.</li>
+        <li><span class="guide-kbd">Excel</span> — Fichier .xlsx pour analyse complémentaire.</li>
+    </ul>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 10 — PV DE RECENSEMENT
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap10">
+    <h2>10. PV de recensement (Inventaire physique)</h2>
+    <p>
+        Le <strong>PV de recensement</strong> (Modèle 21) est le document qui enregistre l'inventaire physique
+        des matières en fin de gestion. C'est une étape <strong>obligatoire</strong> avant la clôture d'exercice.
+    </p>
+
+    <h3>10.1 Remplir le PV</h3>
+    <p>Pour chaque matière, saisissez les quantités physiquement constatées dans trois catégories :</p>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Catégorie</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><strong>En attente d'affectation</strong></td><td>Matières en stock, non encore distribuées.</td></tr>
+            <tr><td><strong>En service</strong></td><td>Matières mises en service (en utilisation active).</td></tr>
+            <tr><td><strong>En sortie provisoire</strong></td><td>Matières prêtées ou temporairement hors du service.</td></tr>
+        </tbody>
+    </table>
+
+    <div class="guide-step">
+        <span class="guide-step-num">1</span>
+        <div class="guide-step-text">Accédez à <strong>Écran 2 → PV de recensement</strong>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">2</span>
+        <div class="guide-step-text">Pour chaque matière, saisissez les <strong>trois quantités</strong> (attente, en service, provisoire).</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">3</span>
+        <div class="guide-step-text">Cliquez sur <span class="guide-kbd">Enregistrer</span> pour chaque ligne modifiée.</div>
+    </div>
+
+    <h3>10.2 Calcul des écarts</h3>
+    <p>Une fois les trois quantités renseignées, l'application calcule automatiquement :</p>
+    <ul>
+        <li><strong>Stock physique</strong> = Attente + En service + Provisoire</li>
+        <li><strong>Écart</strong> = Stock physique − Stock comptable (issu du relevé récapitulatif)</li>
+    </ul>
+    <div class="guide-tip">
+        <strong>💡 Astuce :</strong> Un écart positif (+) signifie un excédent ; un écart négatif (−) signifie un déficit.
+        Ces écarts seront repris dans le rapport final pour génération des bons de régularisation.
+    </div>
+
+    <h3>10.3 Exporter le PV</h3>
+    <ul>
+        <li><span class="guide-kbd">PDF (Modèle 21)</span> — Formulaire officiel prêt à signer.</li>
+        <li><span class="guide-kbd">Excel</span> — Export pour archivage numérique.</li>
+    </ul>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 11 — RAPPORT FINAL DE GESTION
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap11">
+    <h2>11. Rapport final de gestion</h2>
+    <p>
+        Le <strong>Rapport final</strong> est le document de synthèse de fin d'exercice. Il compare le stock comptable
+        avec l'inventaire physique et prépare les régularisations nécessaires.
+    </p>
+
+    <h3>11.1 Contenu du rapport</h3>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Section</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Bilan comptable</td><td>Résumé des entrées par matière, ventilées entre <em>existant en début de gestion</em> (Bon N°1) et <em>entrées en cours de gestion</em>, les sorties et les soldes.</td></tr>
+            <tr><td>Inventaire physique</td><td>Résultats du PV de recensement.</td></tr>
+            <tr><td>Écarts constatés</td><td>Liste des matières présentant des différences entre stock comptable et physique.</td></tr>
+            <tr><td>Régularisations</td><td>Bons d'ajustement proposés pour corriger les écarts.</td></tr>
+            <tr><td>Balance générale</td><td>Solde final après régularisations (Modèle 22).</td></tr>
+        </tbody>
+    </table>
+
+    <h3>11.2 Créer les bons de régularisation</h3>
+    <p>Lorsque des écarts sont constatés, le rapport propose deux actions :</p>
+    <div class="guide-step">
+        <span class="guide-step-num">+</span>
+        <div class="guide-step-text"><span class="guide-kbd">Créer bon de régularisation (+)</span> — Génère un bon d'entrée global pour les excédents constatés.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">−</span>
+        <div class="guide-step-text"><span class="guide-kbd">Créer bon de régularisation (−)</span> — Génère un bon de sortie global pour les déficits constatés.</div>
+    </div>
+
+    <div class="guide-warning">
+        <strong>⚠️ Important :</strong> Les bons de régularisation sont créés automatiquement en un clic.
+        Ils regroupent toutes les matières concernées dans un seul bon. Vérifiez bien les écarts avant de les générer.
+    </div>
+
+    <h3>11.3 Balance générale (Modèle 22)</h3>
+    <p>
+        La balance générale présente le <strong>solde final après régularisations</strong>.
+        Comme le relevé récapitulatif, elle distingue l'<em>existant en début de gestion</em> (Bon N°1)
+        et les <em>entrées en cours de gestion</em> dans deux colonnes séparées.
+        Elle est exportable en <span class="guide-kbd">PDF</span> et <span class="guide-kbd">Excel</span>
+        et constitue le document officiel de clôture.
+    </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 12 — CLÔTURE ET REPORT
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap12">
+    <h2>12. Clôture et report d'exercice</h2>
+    <p>
+        La clôture de l'exercice est l'opération finale qui ferme l'exercice en cours et
+        crée automatiquement l'exercice suivant avec les soldes reportés.
+    </p>
+
+    <h3>12.1 Conditions préalables</h3>
+    <p>Avant de pouvoir clôturer, l'application vérifie une <strong>liste de contrôle</strong> :</p>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Vérification</th><th>Condition</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Matières existantes</td><td>Au moins une matière doit exister dans la structure.</td></tr>
+            <tr><td>PV de recensement</td><td>Tous les PV doivent être remplis (les 3 catégories saisies).</td></tr>
+            <tr><td>Stock positif</td><td>Aucun stock négatif ne doit subsister.</td></tr>
+        </tbody>
+    </table>
+
+    <div class="guide-warning">
+        <strong>⚠️ Attention :</strong> Si une condition n'est pas remplie, le bouton de clôture est désactivé.
+        Corrigez les anomalies avant de relancer l'opération.
+    </div>
+
+    <h3>12.2 Procédure de clôture</h3>
+    <div class="guide-step">
+        <span class="guide-step-num">1</span>
+        <div class="guide-step-text">Accédez à <strong>Écran 2 → Clôture / Report</strong>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">2</span>
+        <div class="guide-step-text">Vérifiez que toutes les <strong>conditions préalables</strong> sont cochées en vert.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">3</span>
+        <div class="guide-step-text">Consultez l'<strong>aperçu de la balance d'entrée</strong> qui sera reportée (quantités et montants par matière).</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">4</span>
+        <div class="guide-step-text">Cliquez sur <span class="guide-kbd">Confirmer la clôture et le report</span>.</div>
+    </div>
+
+    <h3>12.3 Résultat de la clôture</h3>
+    <p>L'opération produit les effets suivants :</p>
+    <ul>
+        <li>L'exercice en cours est marqué <strong>clôturé</strong> et passe en <strong>lecture seule</strong>.</li>
+        <li>Un <strong>nouvel exercice</strong> (N+1) est créé automatiquement.</li>
+        <li>Un <strong>Bon N°1</strong> (balance d'entrée) est généré dans le nouvel exercice, reprenant les soldes de clôture.</li>
+        <li>La numérotation des bons repart de <strong>1</strong> dans le nouvel exercice.</li>
+        <li>L'application bascule automatiquement sur le nouvel exercice.</li>
+    </ul>
+
+    <div class="guide-tip">
+        <strong>💡 Astuce :</strong> Vous pouvez toujours revenir consulter un exercice clôturé en changeant d'exercice
+        via <strong>Service / Exercice</strong>. Les données sont accessibles en lecture seule.
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 13 — ÉCRAN 3 : MOUVEMENTS INTERNES
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap13">
+    <h2>13. Écran 3 — Mouvements internes</h2>
+    <p>
+        Cet écran permet de suivre les mouvements internes des matières entre localisations
+        (magasin, bureau, salle, parc auto, etc.) sans sortir du périmètre de la structure.
+    </p>
+
+    <h3>13.1 Localisations</h3>
+    <p>
+        La section <strong>Localisations</strong> permet de créer et maintenir les emplacements internes
+        utilisés dans les bordereaux d'affectation, de mutation et de désaffectation.
+    </p>
+    <ul>
+        <li>Créer une localisation avec son type, son responsable et son statut actif/inactif.</li>
+        <li>Mettre à jour une localisation existante en cas de changement organisationnel.</li>
+        <li>Utiliser ces localisations comme source/destination dans les bordereaux.</li>
+    </ul>
+
+    <h3>13.2 Bordereaux internes</h3>
+    <p>
+        La section <strong>Bordereaux</strong> centralise les mouvements internes déjà enregistrés et
+        permet de créer de nouveaux bordereaux pour tracer les changements de détenteur ou d'emplacement.
+    </p>
+    <div class="guide-step">
+        <span class="guide-step-num">1</span>
+        <div class="guide-step-text">Accédez à <strong>Écran 3 → Nouveau bordereau</strong>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">2</span>
+        <div class="guide-step-text">Sélectionnez le <strong>type de mouvement</strong> (affectation, mutation ou désaffectation).</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">3</span>
+        <div class="guide-step-text">Renseignez la date, le motif et les localisations source/destination selon le type.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">4</span>
+        <div class="guide-step-text">Ajoutez les matières concernées puis enregistrez le bordereau.</div>
+    </div>
+
+    <div class="guide-tip">
+        <strong>💡 Astuce :</strong> Utilisez les filtres (type, date, source, destination, recherche texte)
+        dans la liste des bordereaux pour retrouver rapidement un document et l'imprimer en PDF.
+    </div>
+
+    <h3>13.3 Inventaire individuel contradictoire</h3>
+    <p>
+        La section <strong>Inventaire individuel contradictoire</strong> édite la fiche annuelle par
+        localisation/détenteur, utile pour le contrôle interne et les vérifications contradictoires.
+    </p>
+    <ul>
+        <li>Sélectionnez la localisation concernée.</li>
+        <li>Vérifiez la liste des matières affectées et leurs quantités.</li>
+        <li>Générez la fiche au format PDF pour signature et archivage.</li>
+    </ul>
+
+    <div class="guide-warning">
+        <strong>⚠️ Important :</strong> Si l'exercice fiscal est clôturé, les données restent consultables
+        mais les opérations d'édition/création sont bloquées en lecture seule.
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 13 — ÉCRAN 4 : MODÈLES DE DOCUMENTS
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap14">
+    <h2>14. Écran 4 — Modèles de documents</h2>
+    <p>
+        Cet écran permet de télécharger les <strong>modèles de formulaires officiels</strong>
+        (PDF, Word, Excel) mis à disposition par l'administration.
+    </p>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Document</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Modèle 20</td><td>Relevé récapitulatif des matières.</td></tr>
+            <tr><td>Modèle 21</td><td>PV de recensement (inventaire physique).</td></tr>
+            <tr><td>Modèle 22</td><td>Balance générale des comptes de matières.</td></tr>
+            <tr><td>Modèles 2 / 3</td><td>Bons d'entrée et de sortie.</td></tr>
+        </tbody>
+    </table>
+    <p>
+        <strong>Administrateur :</strong> Peut téléverser de nouveaux modèles. Les formats acceptés sont :
+        PDF, Word (.docx, .doc), Excel (.xlsx, .xls), ODS, ODT, TXT, CSV, images (PNG, JPG).
+        La taille maximale autorisée est de <strong>10 Mo</strong>.
+    </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 14 — TABLEAU DE BORD QUALITÉ
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap15">
+    <h2>15. Tableau de bord qualité</h2>
+    <p>
+        Accessible depuis <strong>Écran 2 → Tableau de bord</strong>, cette page offre une vue synthétique
+        de l'état de la comptabilité matières.
+    </p>
+
+    <h3>14.1 Indicateurs clés</h3>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Indicateur</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Nombre de matières</td><td>Nombre total de comptes de matières dans la structure.</td></tr>
+            <tr><td>Nombre de bons</td><td>Nombre total de bons saisis pour l'exercice.</td></tr>
+            <tr><td>Quantité en stock</td><td>Quantité totale de matières restantes.</td></tr>
+            <tr><td>Valeur du stock</td><td>Montant total valorisé du stock restant.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>14.2 Indicateurs qualité</h3>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Indicateur</th><th>Signification</th><th>Action recommandée</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>PV remplis / manquants</td><td>Nombre de matières ayant un PV de recensement complet.</td><td>Remplir les PV manquants avant clôture.</td></tr>
+            <tr><td>Écarts non nuls</td><td>Nombre de matières avec un écart entre stock physique et comptable.</td><td>Vérifier les inventaires ou créer des bons de régularisation.</td></tr>
+            <tr><td>Stocks négatifs</td><td>Matières dont le solde est inférieur à zéro (anomalie).</td><td>Corriger via un bon d'entrée rectificatif.</td></tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 15 — RAPPORT CENTRAL
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap16">
+    <h2>16. Rapport central (Administrateur uniquement)</h2>
+    <p>
+        Le <strong>Rapport central</strong> offre une vision consolidée de l'ensemble des structures.
+        Il est accessible uniquement aux administrateurs depuis <strong>Écran 1 → Rapport central</strong>.
+    </p>
+
+    <h3>Contenu du rapport</h3>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Colonne</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Structure</td><td>Code et nom de la structure.</td></tr>
+            <tr><td>Exercice</td><td>Année de l'exercice fiscal.</td></tr>
+            <tr><td>Nombre de matières</td><td>Nombre de comptes actifs.</td></tr>
+            <tr><td>Nombre de bons</td><td>Bons saisis dans la période.</td></tr>
+            <tr><td>Quantité en stock</td><td>Stock total (toutes matières).</td></tr>
+            <tr><td>Valeur du stock</td><td>Valorisation financière totale.</td></tr>
+        </tbody>
+    </table>
+    <p>
+        Filtrez par exercice pour comparer les données d'une année à l'autre.
+        Exportez le rapport en <span class="guide-kbd">Excel</span> pour analyse.
+    </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 16 — IMPRESSION ET EXPORT
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap17">
+    <h2>17. Impression et export PDF / Excel</h2>
+
+    <h3>16.1 Documents imprimables</h3>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Document</th><th>Format</th><th>Modèle officiel</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Bons (entrée, sortie déf., sortie prov.)</td><td>Impression navigateur</td><td>Modèle 2 / 3</td></tr>
+            <tr><td>Relevé récapitulatif</td><td>PDF + Excel</td><td>Modèle 20</td></tr>
+            <tr><td>PV de recensement</td><td>PDF + Excel</td><td>Modèle 21</td></tr>
+            <tr><td>Balance générale des comptes</td><td>PDF + Excel</td><td>Modèle 22</td></tr>
+            <tr><td>Rapport central</td><td>Excel</td><td>—</td></tr>
+        </tbody>
+    </table>
+
+    <h3>16.2 Imprimer une page</h3>
+    <div class="guide-step">
+        <span class="guide-step-num">1</span>
+        <div class="guide-step-text">Accédez à la page souhaitée (fiche de bon, relevé, PV, etc.).</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">2</span>
+        <div class="guide-step-text">Cliquez sur <span class="guide-kbd">🖨️ Imprimer / PDF</span> ou utilisez le raccourci <span class="guide-kbd">Ctrl + P</span>.</div>
+    </div>
+    <div class="guide-step">
+        <span class="guide-step-num">3</span>
+        <div class="guide-step-text">Dans la boîte de dialogue d'impression, choisissez votre imprimante ou <strong>« Enregistrer au format PDF »</strong> pour exporter en fichier PDF.</div>
+    </div>
+
+    <div class="guide-tip">
+        <strong>💡 Astuce :</strong> L'application masque automatiquement la barre de navigation et les boutons lors de l'impression.
+        Seul le contenu utile est imprimé sur format A4.
+    </div>
+
+    <h3>16.3 Exporter en Excel</h3>
+    <p>
+        Sur les pages qui le proposent, cliquez sur le bouton <span class="guide-kbd">Excel</span>.
+        Le fichier .xlsx est téléchargé directement dans votre dossier de téléchargements.
+    </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 17 — GLOSSAIRE
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap18">
+    <h2>18. Glossaire</h2>
+    <table class="guide-table">
+        <thead>
+            <tr><th>Terme</th><th>Définition</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Bon</strong></td>
+                <td>Document officiel enregistrant un mouvement de matières (entrée ou sortie). Chaque bon est numéroté séquentiellement dans un exercice.</td>
+            </tr>
+            <tr>
+                <td><strong>CMUP</strong></td>
+                <td><em>Coût Moyen Unitaire Pondéré.</em> Méthode de valorisation du stock : le prix de sortie est calculé en divisant le montant total des entrées par la quantité restante en stock. Les textes autorisent CMUP ou FIFO ; cette application utilise le CMUP.</td>
+            </tr>
+            <tr>
+                <td><strong>Écart</strong></td>
+                <td>Différence entre le stock physique (constaté lors du recensement) et le stock comptable (calculé dans le relevé). Un écart positif = excédent ; un écart négatif = déficit.</td>
+            </tr>
+            <tr>
+                <td><strong>Exercice fiscal</strong></td>
+                <td>Période comptable (généralement une année civile) pendant laquelle les mouvements de matières sont enregistrés. Un exercice clôturé est en lecture seule.</td>
+            </tr>
+            <tr>
+                <td><strong>Grand livre</strong></td>
+                <td>Document retraçant tous les mouvements d'un compte de matière donné, avec le solde cumulé après chaque opération.</td>
+            </tr>
+            <tr>
+                <td><strong>Livre-journal</strong></td>
+                <td>Registre chronologique de toutes les écritures comptables (entrées et sorties) de l'exercice.</td>
+            </tr>
+            <tr>
+                <td><strong>Matière</strong></td>
+                <td>Bien meuble (fourniture, équipement, consommable) suivi en comptabilité. Chaque matière est identifiée par un code, un nom, une unité et un groupe.</td>
+            </tr>
+            <tr>
+                <td><strong>Nomenclature</strong></td>
+                <td>Référentiel central des codes de comptes de matières, géré par l'administrateur et propagé vers les structures.</td>
+            </tr>
+            <tr>
+                <td><strong>PV de recensement</strong></td>
+                <td><em>Procès-verbal de recensement.</em> Document constatant le résultat de l'inventaire physique annuel des matières, établi en fin de gestion.</td>
+            </tr>
+            <tr>
+                <td><strong>Régularisation</strong></td>
+                <td>Écriture comptable corrective générée pour aligner le stock comptable sur le stock physique constaté lors du recensement. Un bon de régularisation (+) corrige un excédent, un bon (−) corrige un déficit.</td>
+            </tr>
+            <tr>
+                <td><strong>Relevé récapitulatif</strong></td>
+                <td>Tableau de synthèse présentant, pour chaque matière, l'existant en début de gestion (Bon N°1), les entrées en cours de gestion, le total des sorties et le solde restant. Correspond au Modèle 20.</td>
+            </tr>
+            <tr>
+                <td><strong>Structure</strong></td>
+                <td>Entité organisationnelle (service, hôpital, direction régionale) disposant de sa propre comptabilité matières.</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPITRE 18 — FAQ
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section" id="chap19">
+    <h2>19. Questions fréquentes (FAQ)</h2>
+
+    <h3>Je ne vois pas ma structure — que faire ?</h3>
+    <p>
+        Votre compte doit être rattaché à une structure par un administrateur.
+        Contactez l'administrateur pour qu'il vous assigne la structure concernée via <strong>Gestion des utilisateurs</strong>.
+    </p>
+
+    <h3>Peut-on modifier un bon après sa saisie ?</h3>
+    <p>
+        Les bons enregistrés ne sont pas modifiables directement. En cas d'erreur, saisissez un <strong>bon correctif</strong>
+        (entrée pour compenser une sortie erronée, ou inversement). Toutes les corrections sont tracées dans le journal d'audit.
+    </p>
+
+    <h3>Comment corriger un stock négatif ?</h3>
+    <p>
+        Un stock négatif est une anomalie. Saisissez un <strong>bon d'entrée</strong> pour régulariser la quantité manquante.
+        Vérifiez également que les bons de sortie précédents sont corrects.
+    </p>
+
+    <h3>Que se passe-t-il si je clôture par erreur ?</h3>
+    <p>
+        La clôture est <strong>irréversible</strong>. L'exercice clôturé passe définitivement en lecture seule.
+        Le nouvel exercice est créé avec les soldes reportés. En cas d'erreur majeure, contactez l'administrateur.
+    </p>
+
+    <h3>Comment est calculé le prix de sortie ?</h3>
+    <p>
+        Le prix unitaire de sortie est le <strong>CMUP</strong> (Coût Moyen Unitaire Pondéré), calculé automatiquement :
+    </p>
+    <p style="text-align:center; font-style:italic;">
+        CMUP = Montant total des entrées ÷ Quantité restante en stock
+    </p>
+    <p>
+        Ce prix s'applique uniformément à toutes les sorties. Vous n'avez pas à le saisir manuellement.
+    </p>
+
+    <h3>Comment imprimer ce guide ?</h3>
+    <p>
+        Cliquez sur le bouton <span class="guide-kbd">🖨️ Imprimer / PDF</span> en haut de cette page,
+        ou utilisez <span class="guide-kbd">Ctrl + P</span>. Dans la boîte de dialogue, choisissez votre imprimante
+        ou « Enregistrer au format PDF ».
+    </p>
+
+    <h3>Quels navigateurs sont compatibles ?</h3>
+    <p>
+        L'application fonctionne avec tous les navigateurs modernes : Google Chrome, Mozilla Firefox, Microsoft Edge, Safari.
+        Chrome est recommandé pour une meilleure qualité d'impression PDF.
+    </p>
+
+    <h3>Les données sont-elles sécurisées ?</h3>
+    <p>
+        Oui. Toutes les opérations sensibles (création, modification, suppression, import, clôture, connexion) sont
+        enregistrées dans un <strong>journal d'audit</strong>. Les accès sont contrôlés par rôle et par structure.
+        Les documents téléversés sont vérifiés (extension, type MIME, taille) et les rejets sont journalisés.
+    </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     WORKFLOW SYNTHÉTIQUE
+     ═══════════════════════════════════════════════════════ -->
+<section class="panel guide-section">
+    <h2>Annexe — Flux de travail annuel</h2>
+    <p>Voici le déroulement type d'un exercice comptable :</p>
+    <div class="guide-flow">
+        <span class="guide-flow-item"><strong>1.</strong> Paramétrage</span>
+        <span class="guide-flow-arrow">→</span>
+        <span class="guide-flow-item"><strong>2.</strong> Saisie des bons (entrées / sorties)</span>
+        <span class="guide-flow-arrow">→</span>
+        <span class="guide-flow-item"><strong>3.</strong> Suivi (Journal, Grand livre, Relevé)</span>
+        <span class="guide-flow-arrow">→</span>
+        <span class="guide-flow-item"><strong>4.</strong> PV de recensement</span>
+        <span class="guide-flow-arrow">→</span>
+        <span class="guide-flow-item"><strong>5.</strong> Rapport final + Régularisations</span>
+        <span class="guide-flow-arrow">→</span>
+        <span class="guide-flow-item"><strong>6.</strong> Clôture + Report N+1</span>
+    </div>
+</section>
+
+</div><!-- /guide-container -->
+{% endblock %}

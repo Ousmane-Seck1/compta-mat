@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% load l10n %}
+
+{% block title %}Nouveau bordereau interne{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Nouveau bordereau interne — N°&nbsp;{{ next_number }}</h2>
+            <p class="screen-desc">
+                Affectation : magasin → bureau&nbsp;|&nbsp;Mutation : bureau → bureau&nbsp;|&nbsp;Désaffectation : bureau → magasin.
+                Le mouvement met à jour les quantités sans créer d'écriture comptable.
+            </p>
+        </div>
+        <a class="button secondary" href="{% url 'internal_movement_list' %}">Liste des bordereaux</a>
+    </div>
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}" style="margin-bottom:0.75rem;">{{ message }}</div>
+    {% endfor %}
+    {% endif %}
+
+    {% if not can_edit %}
+    <p class="text-warning">Votre profil est en consultation seulement.</p>
+    {% elif is_fiscal_year_closed %}
+    <p style="color:#9c2f2f;"><strong>Exercice clôturé :</strong> la création de bordereaux est désactivée.</p>
+    {% endif %}
+
+    <form method="post" id="bordereau-form">
+        {% csrf_token %}
+
+        <fieldset style="border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+            <legend style="font-weight:600;padding:0 0.5rem;">En-tête du bordereau</legend>
+            <div class="form-grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;">
+                <div>
+                    <label for="{{ form.movement_type.id_for_label }}"><strong>{{ form.movement_type.label }}</strong></label>
+                    {{ form.movement_type }}
+                    {% if form.movement_type.errors %}<div class="form-error">{{ form.movement_type.errors.0 }}</div>{% endif %}
+                    <div id="movement-hint" style="margin-top:0.4rem;font-size:0.82rem;color:var(--muted);min-height:1.2rem;"></div>
+                </div>
+                <div>
+                    <label for="{{ form.operation_date.id_for_label }}"><strong>{{ form.operation_date.label }}</strong></label>
+                    {{ form.operation_date }}
+                    {% if form.operation_date.errors %}<div class="form-error">{{ form.operation_date.errors.0 }}</div>{% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.from_location.id_for_label }}"><strong>{{ form.from_location.label }}</strong></label>
+                    {{ form.from_location }}
+                    {% if form.from_location.errors %}<div class="form-error">{{ form.from_location.errors.0 }}</div>{% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.to_location.id_for_label }}"><strong>{{ form.to_location.label }}</strong></label>
+                    {{ form.to_location }}
+                    {% if form.to_location.errors %}<div class="form-error">{{ form.to_location.errors.0 }}</div>{% endif %}
+                </div>
+                <div style="grid-column:1/-1;">
+                    <label for="{{ form.reason.id_for_label }}"><strong>{{ form.reason.label }}</strong></label>
+                    {{ form.reason }}
+                    {% if form.reason.errors %}<div class="form-error">{{ form.reason.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+        </fieldset>
+
+        <h3 style="margin-bottom:0.5rem;">Lignes du bordereau</h3>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.75rem;">
+            Le N° nomenclature et l'unité sont remplis automatiquement à la sélection de la matière. Le montant est calculé automatiquement (Qté × PU).
+        </p>
+
+        <div style="overflow-x:auto;">
+        <table id="lines-table" style="min-width:1080px;table-layout:fixed;">
+            <colgroup>
+                <col style="width:9%">
+                <col style="width:24%">
+                <col style="width:11%">
+                <col style="width:7%">
+                <col style="width:6%">
+                <col style="width:9%">
+                <col style="width:9%">
+                <col style="width:20%">
+                <col style="width:5%">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>N° nomenclature</th>
+                    <th>Désignation</th>
+                    <th>Code d'immatriculation</th>
+                    <th>Quantité</th>
+                    <th>Unité</th>
+                    <th>Prix unitaire</th>
+                    <th>Montant</th>
+                    <th>Observations</th>
+                    <th class="no-print"></th>
+                </tr>
+            </thead>
+            <tbody id="lines-tbody">
+                {% for row in line_rows %}
+                <tr>
+                    <td>
+                        <input type="text" class="line-nomenclature" readonly
+                            style="background:rgba(0,0,0,0.04);width:100%;font-size:0.85rem;padding:0.25rem 0.35rem;"
+                            value="{{ row.account_code|default:'' }}">
+                    </td>
+                    <td>
+                        <select name="line_material_{{ row.index }}" class="material-select" style="width:100%;">
+                            <option value=""></option>
+                            {% for material in materials_with_cmup %}
+                            <option value="{{ material.id }}"
+                                data-account-code="{{ material.account_code }}"
+                                data-unit="{{ material.unit }}"
+                                data-cmup="{{ material.cmup|unlocalize }}"
+                                {% if row.material_id == material.id|stringformat:'s' %}selected{% endif %}>
+                                {{ material.account_code }} — {{ material.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td><input type="text" name="line_inventory_code_{{ row.index }}" value="{{ row.inventory_code }}" style="width:100%;font-size:0.85rem;"></td>
+                    <td><input type="number" step="1" min="0" name="line_quantity_{{ row.index }}" value="{{ row.quantity }}" class="line-quantity" style="width:100%;font-size:0.85rem;"></td>
+                    <td>
+                        <input type="text" class="line-unit" readonly
+                            style="background:rgba(0,0,0,0.04);width:100%;font-size:0.85rem;padding:0.25rem 0.35rem;"
+                            value="{{ row.unit|default:'' }}">
+                    </td>
+                    <td><input type="number" step="any" min="0" name="line_unit_price_{{ row.index }}" value="{{ row.unit_price }}" class="line-unit-price" style="width:100%;font-size:0.85rem;"></td>
+                    <td>
+                        <input type="text" class="line-amount" readonly
+                            style="background:rgba(0,0,0,0.04);width:100%;font-size:0.85rem;padding:0.25rem 0.35rem;text-align:right;"
+                            value="{{ row.amount|default:'' }}">
+                    </td>
+                    <td><input type="text" name="line_observations_{{ row.index }}" value="{{ row.observations }}" style="width:100%;font-size:0.85rem;"></td>
+                    <td class="no-print" style="text-align:center;">
+                        <button type="button" class="remove-line-btn" title="Supprimer"
+                            style="background:none;border:none;cursor:pointer;color:#9c2f2f;font-size:1.1rem;">✕</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="6" style="text-align:right;font-weight:600;padding:0.4rem;">Total :</td>
+                    <td id="grand-total" style="font-weight:600;text-align:right;padding:0.4rem;"></td>
+                    <td colspan="2"></td>
+                </tr>
+            </tfoot>
+        </table>
+        </div>
+
+        <input type="hidden" name="line_count" id="line_count_input" value="{{ line_rows|length }}">
+
+        {% if can_edit and not is_fiscal_year_closed %}
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap;">
+            <button type="button" id="add-line-btn" class="button secondary">+ Ajouter une ligne</button>
+            <button class="button" type="submit">Enregistrer le bordereau</button>
+        </div>
+        {% endif %}
+    </form>
+</section>
+
+<script>
+/* =========================================================
+   Données injectées par Django
+   ========================================================= */
+const INTERNAL_MATERIALS = [
+    {% for material in materials_with_cmup %}{
+        id: "{{ material.id }}",
+        accountCode: "{{ material.account_code|escapejs }}",
+        name: "{{ material.name|escapejs }}",
+        unit: "{{ material.unit|escapejs }}",
+        cmup: "{{ material.cmup|unlocalize }}"
+    }{% if not forloop.last %},{% endif %}{% endfor %}
+];
+
+const LOCATIONS_DATA = [
+    {% for loc in locations_data %}{
+        id: "{{ loc.id }}",
+        name: "{{ loc.name|escapejs }}",
+        isStore: {{ loc.is_store|yesno:"true,false" }}
+    }{% if not forloop.last %},{% endif %}{% endfor %}
+];
+
+/* =========================================================
+   Utilitaires
+   ========================================================= */
+function parseNum(val) {
+    const n = parseFloat(String(val || '0').replace(/\s/g, '').replace(',', '.'));
+    return isNaN(n) ? 0 : n;
+}
+function formatAmount(v) {
+    if (v === '' || v === null || v === undefined) return '';
+    return new Intl.NumberFormat('fr-FR', {minimumFractionDigits:0, maximumFractionDigits:0}).format(v);
+}
+function materialById(id) {
+    return INTERNAL_MATERIALS.find(function(m) { return m.id === String(id); });
+}
+
+/* =========================================================
+   Sync d'une ligne (nomenclature, unité, PU, montant)
+   ========================================================= */
+function syncRow(row) {
+    const select   = row.querySelector('select.material-select');
+    const nomInput = row.querySelector('.line-nomenclature');
+    const unitInp  = row.querySelector('.line-unit');
+    const puInput  = row.querySelector('.line-unit-price');
+    if (!select) return;
+    const mat = select.value ? materialById(select.value) : null;
+    if (nomInput) nomInput.value  = mat ? mat.accountCode : '';
+    if (unitInp)  unitInp.value   = mat ? mat.unit : '';
+    if (puInput && mat && !puInput.value) puInput.value = mat.cmup;
+    recomputeAmount(row);
+}
+
+function recomputeAmount(row) {
+    const qty     = parseNum(row.querySelector('.line-quantity') && row.querySelector('.line-quantity').value);
+    const pu      = parseNum(row.querySelector('.line-unit-price') && row.querySelector('.line-unit-price').value);
+    const amtInp  = row.querySelector('.line-amount');
+    if (amtInp) amtInp.value = (qty > 0 && pu >= 0) ? formatAmount(qty * pu) : '';
+    updateGrandTotal();
+}
+
+function updateGrandTotal() {
+    let total = 0;
+    document.querySelectorAll('#lines-tbody .line-amount').forEach(function(inp) {
+        total += parseNum(inp.value);
+    });
+    const cell = document.getElementById('grand-total');
+    if (cell) cell.textContent = formatAmount(total);
+}
+
+/* =========================================================
+   Filtrage des localisations source / destination
+   ========================================================= */
+const MOVE_HINTS = {
+    affectation:    'Affectation&nbsp;: source = <strong>magasin</strong>, destination = <strong>bureau/salle</strong>.',
+    mutation:       'Mutation&nbsp;: source et destination = <strong>bureaux/salles</strong>.',
+    desaffectation: 'Désaffectation&nbsp;: source = <strong>bureau/salle</strong>, destination = <strong>magasin</strong>.'
+};
+
+function filterSelect(selectEl, allowStore) {
+    if (!selectEl) return;
+    const currentVal = selectEl.value;
+    let firstAllowed = '';
+    Array.from(selectEl.options).forEach(function(opt) {
+        if (!opt.value) { opt.disabled = false; return; }
+        const loc = LOCATIONS_DATA.find(function(l) { return l.id === opt.value; });
+        const allowed = allowStore === null || (loc && loc.isStore === allowStore);
+        opt.disabled = !allowed;
+        opt.style.display = allowed ? '' : 'none';
+        if (allowed && !firstAllowed) firstAllowed = opt.value;
+    });
+    const selOpt = selectEl.querySelector('option[value="' + currentVal + '"]');
+    if (!currentVal || (selOpt && selOpt.disabled)) selectEl.value = firstAllowed || '';
+}
+
+function applyMovementFilter() {
+    const typeEl = document.getElementById('id_movement_type');
+    const fromEl = document.getElementById('id_from_location');
+    const toEl   = document.getElementById('id_to_location');
+    const hint   = document.getElementById('movement-hint');
+    if (!typeEl) return;
+    const t = typeEl.value;
+    if (hint) hint.innerHTML = MOVE_HINTS[t] || '';
+    if      (t === 'affectation')    { filterSelect(fromEl, true);  filterSelect(toEl, false); }
+    else if (t === 'mutation')       { filterSelect(fromEl, false); filterSelect(toEl, false); }
+    else if (t === 'desaffectation') { filterSelect(fromEl, false); filterSelect(toEl, true);  }
+    else                             { filterSelect(fromEl, null);  filterSelect(toEl, null);  }
+}
+
+/* =========================================================
+   Construction HTML d'une nouvelle ligne vide
+   ========================================================= */
+function buildMaterialOptions() {
+    let html = '<option value=""></option>';
+    INTERNAL_MATERIALS.forEach(function(m) {
+        html += '<option value="' + m.id + '" data-account-code="' + m.accountCode + '" data-unit="' + m.unit + '" data-cmup="' + m.cmup + '">' + m.accountCode + ' \u2014 ' + m.name + '</option>';
+    });
+    return html;
+}
+
+function addLine() {
+    const tbody = document.getElementById('lines-tbody');
+    const lcInp = document.getElementById('line_count_input');
+    if (!tbody || !lcInp) return;
+    const idx = parseInt(lcInp.value || '0', 10);
+    const row = document.createElement('tr');
+    const baseStyle = 'width:100%;font-size:0.85rem;';
+    const roStyle   = baseStyle + 'background:rgba(0,0,0,0.04);padding:0.25rem 0.35rem;';
+    row.innerHTML =
+        '<td><input type="text" class="line-nomenclature" readonly style="' + roStyle + '"></td>' +
+        '<td><select name="line_material_' + idx + '" class="material-select" style="width:100%;">' + buildMaterialOptions() + '</select></td>' +
+        '<td><input type="text" name="line_inventory_code_' + idx + '" style="' + baseStyle + '"></td>' +
+        '<td><input type="number" step="1" min="0" name="line_quantity_' + idx + '" class="line-quantity" style="' + baseStyle + '"></td>' +
+        '<td><input type="text" class="line-unit" readonly style="' + roStyle + '"></td>' +
+        '<td><input type="number" step="any" min="0" name="line_unit_price_' + idx + '" class="line-unit-price" style="' + baseStyle + '"></td>' +
+        '<td><input type="text" class="line-amount" readonly style="' + roStyle + 'text-align:right;"></td>' +
+        '<td><input type="text" name="line_observations_' + idx + '" style="' + baseStyle + '"></td>' +
+        '<td class="no-print" style="text-align:center;"><button type="button" class="remove-line-btn" style="background:none;border:none;cursor:pointer;color:#9c2f2f;font-size:1.1rem;">&#x2715;</button></td>';
+    tbody.appendChild(row);
+    lcInp.value = idx + 1;
+}
+
+/* =========================================================
+   Initialisation
+   ========================================================= */
+document.addEventListener('DOMContentLoaded', function() {
+    const typeEl = document.getElementById('id_movement_type');
+    const tbody  = document.getElementById('lines-tbody');
+    const addBtn = document.getElementById('add-line-btn');
+
+    applyMovementFilter();
+    if (typeEl) typeEl.addEventListener('change', applyMovementFilter);
+
+    if (tbody) {
+        /* Sync des lignes existantes (après POST en cas d'erreur) */
+        tbody.querySelectorAll('tr').forEach(function(row) {
+            var sel = row.querySelector('select.material-select');
+            if (sel && sel.value) syncRow(row);
+            else recomputeAmount(row);
+        });
+
+        tbody.addEventListener('change', function(e) {
+            const row = e.target.closest('tr');
+            if (!row) return;
+            if (e.target.classList.contains('material-select')) syncRow(row);
+        });
+        tbody.addEventListener('input', function(e) {
+            const row = e.target.closest('tr');
+            if (!row) return;
+            if (e.target.classList.contains('line-quantity') || e.target.classList.contains('line-unit-price')) {
+                recomputeAmount(row);
+            }
+        });
+        tbody.addEventListener('click', function(e) {
+            if (!e.target.classList.contains('remove-line-btn')) return;
+            if (tbody.querySelectorAll('tr').length <= 1) return;
+            const row = e.target.closest('tr');
+            if (row) { row.remove(); updateGrandTotal(); }
+        });
+    }
+
+    if (addBtn) addBtn.addEventListener('click', addLine);
+    updateGrandTotal();
+});
+</script>
+{% endblock %}

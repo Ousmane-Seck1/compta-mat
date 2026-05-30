@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Localisations{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Localisations du service</h2>
+            <p class="screen-desc">Les localisations sont propres à chaque service: magasins, bureaux, salles, parc auto ou autres emplacements.</p>
+        </div>
+        <div class="screen-links">
+            <a class="button secondary" href="{% url 'screen_internal_movements' %}">Écran 3</a>
+        </div>
+    </div>
+
+    <div class="notice-box" style="background: #fff8e1; border-left: 4px solid #f59e0b; padding: 0.85rem 1rem; margin-bottom: 1.5rem; border-radius: 6px;">
+        <strong>⚠ Rappel — un magasin par groupe de matières</strong>
+        <p style="margin: 0.4rem 0 0 0; font-size: 0.92rem;">
+            La création et la gestion des localisations (magasins, bureaux, salles, parc auto…) sont de la responsabilité du <strong>comptable matières de chaque service</strong>, sans intervention de l'administrateur.
+        </p>
+        <p style="margin: 0.5rem 0 0 0; font-size: 0.92rem;">
+            Chaque service doit disposer d'<strong>un magasin distinct par groupe de matières</strong>, même si physiquement c'est le même local :
+        </p>
+        <ul style="margin: 0.4rem 0 0 1.2rem; font-size: 0.92rem;">
+            <li><strong>Magasin de matériel et équipement</strong> — matières durables (code de compte commence par <code>1</code>)</li>
+            <li><strong>Magasin de matières et fournitures</strong> — matières consomptibles au premier usage (code de compte commence par <code>2</code>)</li>
+        </ul>
+        <p style="margin: 0.4rem 0 0 0; font-size: 0.92rem;">
+            Sans cette séparation, les bons d'entrée, de sortie et de régularisation ne pourront pas être émis correctement. Ces bons sont également émis par le comptable matières du service.
+        </p>
+    </div>
+
+    <div class="form-shell" style="margin-bottom: 1.5rem;">
+        <h3>{% if edit_location %}Modifier la localisation{% else %}Nouvelle localisation{% endif %}</h3>
+        <form method="post">
+            {% csrf_token %}
+            {% if edit_location %}<input type="hidden" name="location_id" value="{{ edit_location.id }}">{% endif %}
+            <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+                <p>
+                    {{ form.name.label_tag }}
+                    {{ form.name }}
+                    {% if form.name.errors %}<span class="form-error">{{ form.name.errors.0 }}</span>{% endif %}
+                </p>
+
+                <div style="grid-column: 1 / -1; border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem;">
+                    <strong>Statut fonctionnel de la localisation</strong>
+                    <p style="margin: 0.5rem 0 0 0; display: flex; gap: 1.2rem; flex-wrap: wrap;">
+                        <label>{{ form.pending_status }} {{ form.pending_status.label }}</label>
+                        <label>{{ form.in_service_status }} {{ form.in_service_status.label }}</label>
+                    </p>
+                    {% if form.non_field_errors %}
+                    <p class="form-error" style="margin-top: 0.5rem;">{{ form.non_field_errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <p id="store-type-wrap">
+                    {{ form.store_type.label_tag }}
+                    {{ form.store_type }}
+                    {% if form.store_type.errors %}<span class="form-error">{{ form.store_type.errors.0 }}</span>{% endif %}
+                </p>
+
+                <p id="service-type-wrap">
+                    {{ form.service_type.label_tag }}
+                    {{ form.service_type }}
+                    {% if form.service_type.errors %}<span class="form-error">{{ form.service_type.errors.0 }}</span>{% endif %}
+                </p>
+
+                <p>
+                    {{ form.responsible_name.label_tag }}
+                    {{ form.responsible_name }}
+                    {% if form.responsible_name.errors %}<span class="form-error">{{ form.responsible_name.errors.0 }}</span>{% endif %}
+                </p>
+
+                <p>
+                    {{ form.is_active.label_tag }}
+                    {{ form.is_active }}
+                    {% if form.is_active.errors %}<span class="form-error">{{ form.is_active.errors.0 }}</span>{% endif %}
+                </p>
+
+                <p style="grid-column: 1 / -1;">
+                    {{ form.details.label_tag }}
+                    {{ form.details }}
+                    {% if form.details.errors %}<span class="form-error">{{ form.details.errors.0 }}</span>{% endif %}
+                </p>
+            </div>
+            {% if can_edit %}
+            <button class="button" type="submit">Enregistrer</button>
+            {% endif %}
+        </form>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Type</th>
+                <th>Statut</th>
+                <th>Responsable</th>
+                <th>État</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for location in locations %}
+            <tr>
+                <td>{{ location.name }}</td>
+                <td>{{ location.get_location_type_display }}</td>
+                <td>{% if location.is_store %}En attente d'affectation{% else %}En service{% endif %}</td>
+                <td>{{ location.responsible_name|default:"-" }}</td>
+                <td>{% if location.is_active %}Active{% else %}Inactive{% endif %}</td>
+                <td>
+                    {% if can_edit %}
+                    <a class="button secondary" href="{% url 'location_list' %}?edit={{ location.id }}">Modifier</a>
+                    <form method="post" action="{% url 'location_delete' location.id %}" style="display:inline;" onsubmit="return confirm('Supprimer cette localisation ?');">
+                        {% csrf_token %}
+                        <button class="button danger" type="submit">Supprimer</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6">Aucune localisation enregistrée pour ce service.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const pending = document.getElementById("id_pending_status");
+    const service = document.getElementById("id_in_service_status");
+    const storeWrap = document.getElementById("store-type-wrap");
+    const serviceWrap = document.getElementById("service-type-wrap");
+
+    if (!pending || !service || !storeWrap || !serviceWrap) {
+        return;
+    }
+
+    function syncView() {
+        if (pending.checked && service.checked) {
+            service.checked = false;
+        }
+        if (!pending.checked && !service.checked) {
+            pending.checked = true;
+        }
+        storeWrap.style.display = pending.checked ? "block" : "none";
+        serviceWrap.style.display = service.checked ? "block" : "none";
+    }
+
+    pending.addEventListener("change", function () {
+        if (pending.checked) {
+            service.checked = false;
+        }
+        syncView();
+    });
+    service.addEventListener("change", function () {
+        if (service.checked) {
+            pending.checked = false;
+        }
+        syncView();
+    });
+
+    syncView();
+});
+</script>
+{% endblock %}

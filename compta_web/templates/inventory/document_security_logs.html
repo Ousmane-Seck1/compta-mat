@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Journal sécurité documents{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>Journal sécurité des documents</h2>
+        <a class="button menu-primary" href="{% url 'screen_admin' %}">Retour Ecran 1</a>
+    </div>
+    <p>Traçabilité des rejets upload documents (extension, MIME, taille, scan).</p>
+</section>
+
+<section class="panel no-print">
+    <div class="panel-head">
+        <h3>Maintenance</h3>
+    </div>
+    <form method="post" action="{% url 'document_security_logs_purge' %}" onsubmit="return confirm('Confirmer la purge des journaux anciens ?');" style="display:flex; gap:0.8rem; align-items:flex-end; flex-wrap:wrap;">
+        {% csrf_token %}
+        <div>
+            <label for="retention_days">Conserver les N derniers jours</label>
+            <input id="retention_days" name="retention_days" type="number" min="1" step="1" value="{{ retention_days_default }}" required>
+        </div>
+        <button class="button" type="submit" style="background:#9c2f2f;">Purger les anciens logs</button>
+    </form>
+</section>
+
+<section class="panel no-print">
+    <div class="panel-head">
+        <h3>Filtres</h3>
+    </div>
+    <form method="get" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem; align-items:end;">
+        <div>
+            <label for="reason">Raison</label>
+            <select id="reason" name="reason">
+                <option value="">Toutes</option>
+                {% for item in reasons %}
+                <option value="{{ item }}" {% if filters.reason == item %}selected{% endif %}>{{ item }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="username">Utilisateur</label>
+            <input id="username" name="username" type="text" value="{{ filters.username }}">
+        </div>
+        <div>
+            <label for="ip">IP</label>
+            <input id="ip" name="ip" type="text" value="{{ filters.ip }}">
+        </div>
+        <div>
+            <label for="date_from">Date début</label>
+            <input id="date_from" name="date_from" type="date" value="{{ filters.date_from }}">
+        </div>
+        <div>
+            <label for="date_to">Date fin</label>
+            <input id="date_to" name="date_to" type="date" value="{{ filters.date_to }}">
+        </div>
+        <div>
+            <button class="button" type="submit">Filtrer</button>
+            <a class="button menu-secondary" href="{% url 'document_security_logs' %}">Réinitialiser</a>
+            <a class="button menu-secondary" href="{% url 'document_security_logs_csv' %}?{{ query_without_page }}">Exporter CSV</a>
+        </div>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h3>Evénements</h3>
+        <span>{{ logs.paginator.count }} résultat(s)</span>
+    </div>
+
+    {% if logs %}
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Utilisateur</th>
+                <th>Raison</th>
+                <th>Fichier</th>
+                <th>MIME</th>
+                <th>Taille</th>
+                <th>IP</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.created_at|date:"d/m/Y H:i" }}</td>
+                <td>{% if log.user %}{{ log.user.username }}{% else %}-{% endif %}</td>
+                <td>{{ log.metadata.reason|default:"-" }}</td>
+                <td>{{ log.metadata.filename|default:"-" }}</td>
+                <td>{{ log.metadata.content_type|default:"-" }}</td>
+                <td>{{ log.metadata.size|default:"-" }}</td>
+                <td>{{ log.metadata.ip|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if logs.has_other_pages %}
+    <div class="pagination" style="margin-top: 1rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+        {% if logs.has_previous %}
+        <a class="button menu-secondary" href="?{{ query_without_page }}&page={{ logs.previous_page_number }}">Précédent</a>
+        {% endif %}
+        <span class="button menu-primary" style="pointer-events:none;">Page {{ logs.number }} / {{ logs.paginator.num_pages }}</span>
+        {% if logs.has_next %}
+        <a class="button menu-secondary" href="?{{ query_without_page }}&page={{ logs.next_page_number }}">Suivant</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <p>Aucun événement de sécurité document trouvé.</p>
+    {% endif %}
+</section>
+{% endblock %}

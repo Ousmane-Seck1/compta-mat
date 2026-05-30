@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load inventory_filters %}
+
+{% block title %}Bordereau interne {{ movement.number }}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Bordereau interne {{ movement.number }}</h2>
+            <p class="screen-desc">{{ movement.get_movement_type_display }} du {{ movement.operation_date|date:"d/m/Y" }} de {{ movement.from_location.name }} vers {{ movement.to_location.name }}.</p>
+        </div>
+        <div class="screen-links">
+            <a class="button secondary" href="{% url 'internal_movement_list' %}">Retour</a>
+            <a class="button secondary" href="{% url 'internal_movement_pdf' movement.id %}">Imprimer PDF</a>
+            {% if can_edit and not is_fiscal_year_closed %}
+            <form method="post" action="{% url 'internal_movement_delete' movement.id %}" onsubmit="return confirm('Supprimer ce bordereau interne ?');">
+                {% csrf_token %}
+                <button class="button danger" type="submit">Supprimer</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="summary-grid" style="margin-bottom: 1rem;">
+        <div><strong>Source :</strong> {{ movement.from_location.name }}</div>
+        <div><strong>Destination :</strong> {{ movement.to_location.name }}</div>
+        <div><strong>Motif :</strong> {{ movement.reason|default:"-" }}</div>
+        <div><strong>Saisi par :</strong> {{ movement.created_by|default:"-" }}</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>N° nomenclature</th>
+                <th>Désignation</th>
+                <th>Code d'immatriculation</th>
+                <th>Quantité</th>
+                <th>PU</th>
+                <th>Montant</th>
+                <th>Observations</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line in movement.lines.all %}
+            <tr>
+                <td>{{ line.material.account_code }}</td>
+                <td>{{ line.material_name }}</td>
+                <td>{{ line.inventory_code|default:"-" }}</td>
+                <td>{{ line.quantity|fmt_qty }}</td>
+                <td>{{ line.unit_price|fmt_amount }}</td>
+                <td>{{ line.amount|fmt_amount }}</td>
+                <td>{{ line.observations|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3"><strong>Total quantites</strong></td>
+                <td><strong>{{ total_quantity|fmt_qty }}</strong></td>
+                <td><strong>-</strong></td>
+                <td><strong>{{ movement.total_amount|fmt_amount }}</strong></td>
+                <td><strong>-</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+</section>
+{% endblock %}

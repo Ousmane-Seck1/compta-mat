@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Écran 3 — Mouvements internes{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="screen-title">Écran 3 — Mouvements internes</h2>
+            <p class="screen-desc">Gestion des localisations, des affectations internes et de l'inventaire individuel contradictoire.</p>
+        </div>
+        <div class="screen-links">
+            <a class="button menu-secondary" href="{% url 'user_guide' %}?source=screen3">Guide</a>
+            <a class="button menu-primary" href="{% url 'menu' %}">Accueil</a>
+        </div>
+    </div>
+
+    <div class="alert alert-info" style="margin-bottom: 1rem;">
+        <span>{{ locations_count }} localisation{{ locations_count|pluralize }} active{{ locations_count|pluralize }} et {{ movements_count }} bordereau{{ movements_count|pluralize }} interne{{ movements_count|pluralize }} sur l'exercice courant.</span>
+    </div>
+
+    <div class="nav-cards">
+        <a class="nav-card" href="{% url 'location_list' %}">
+            <div class="nav-card-icon" style="background: rgba(59,130,246,0.10); color: #1d4ed8;">L</div>
+            <div class="nav-card-text">
+                <strong>Localisation</strong>
+                <span>Créer les magasins, bureaux, salles, parcs auto et autres emplacements.</span>
+            </div>
+        </a>
+
+        <a class="nav-card" href="{% url 'internal_movement_list' %}">
+            <div class="nav-card-icon" style="background: rgba(16,185,129,0.10); color: #047857;">B</div>
+            <div class="nav-card-text">
+                <strong>Bordereaux</strong>
+                <span>Consulter les affectations, mutations et désaffectations déjà saisies.</span>
+            </div>
+        </a>
+
+        <a class="nav-card nav-card--highlight" href="{% url 'internal_movement_create' %}">
+            <div class="nav-card-icon" style="background: rgba(138,75,8,0.12); color: var(--accent);">+</div>
+            <div class="nav-card-text">
+                <strong>Nouveau bordereau</strong>
+                <span>Saisir un mouvement interne entre magasin, bureau, salle ou autre localisation.</span>
+            </div>
+        </a>
+
+        <a class="nav-card" href="{% url 'contradictory_inventory' %}">
+            <div class="nav-card-icon" style="background: rgba(236,72,153,0.10); color: #be185d;">F</div>
+            <div class="nav-card-text">
+                <strong>Inventaire individuel contradictoire</strong>
+                <span>Éditer la fiche annuelle des matières détenues par une localisation.</span>
+            </div>
+        </a>
+    </div>
+</section>
+{% endblock %}

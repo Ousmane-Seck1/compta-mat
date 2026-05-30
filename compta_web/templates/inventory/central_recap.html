@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% load inventory_filters %}
+
+{% block title %}Balance générale consolidée{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>Balance générale des comptes consolidée</h2>
+        <div class="screen-links no-print">
+            <a class="button menu-secondary" href="{% url 'central_recap_excel' %}{% if selected_fiscal_year %}?fiscal_year={{ selected_fiscal_year }}{% endif %}">Exporter Excel</a>
+        </div>
+    </div>
+
+    <p>Rapport global obtenu par consolidation des balances finales des services.</p>
+
+    <form method="get" class="inline-form">
+        <div>
+            <label for="fiscal_year_filter">Filtrer par exercice</label>
+            <select name="fiscal_year" id="fiscal_year_filter">
+                {% for fy in all_fiscal_years %}
+                <option value="{{ fy }}" {% if selected_fiscal_year == fy|stringformat:"s" %}selected{% endif %}>
+                    {{ fy }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="button">Filtrer</button>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h3>Consolidation par service</h3>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Service</th>
+                <th>Exercice</th>
+                <th>Bons</th>
+                <th>Qté comptable</th>
+                <th>En attente d'affectation</th>
+                <th>En service</th>
+                <th>En sortie provisoire</th>
+                <th>Valeur du stock</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in aggregate_data %}
+            <tr>
+                <td>
+                    <strong>{{ item.structure.code }}</strong><br>
+                    {{ item.structure.name }}
+                </td>
+                <td>{{ item.fiscal_year.year }}</td>
+                <td>{{ item.vouchers_count }}</td>
+                <td>{{ item.comptable_qty|fmt_qty }}</td>
+                <td>{{ item.pending_qty|fmt_qty }}</td>
+                <td>{{ item.in_service_qty|fmt_qty }}</td>
+                <td>{{ item.provisional_qty|fmt_qty }}</td>
+                <td><strong>{{ item.final_value|fmt_amount }}</strong></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8">Aucune donnée disponible.</td></tr>
+            {% endfor %}
+        </tbody>
+        {% if aggregate_data %}
+        <tfoot>
+            <tr style="font-weight: bold; border-top: 2px solid #333;">
+                <td>TOTAL</td>
+                <td>{{ selected_fiscal_year }}</td>
+                <td>{{ aggregate_totals.vouchers_count }}</td>
+                <td>{{ aggregate_totals.comptable_qty|fmt_qty }}</td>
+                <td>{{ aggregate_totals.pending_qty|fmt_qty }}</td>
+                <td>{{ aggregate_totals.in_service_qty|fmt_qty }}</td>
+                <td>{{ aggregate_totals.provisional_qty|fmt_qty }}</td>
+                <td>{{ aggregate_totals.final_value|fmt_amount }}</td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h3>Balance générale des comptes (somme des services)</h3>
+    </div>
+    <table>
+        <colgroup>
+            <col style="width: 8%;">
+            <col style="width: 18%;">
+            <col>
+            <col>
+            <col>
+            <col>
+            <col>
+            <col>
+            <col>
+            <col>
+            <col>
+            <col>
+        </colgroup>
+        <thead>
+            <tr>
+                <th colspan="3">Compte</th>
+                <th colspan="4">Mouvements comptables</th>
+                <th colspan="4">Stock physique (PV)</th>
+                <th colspan="1">Valeurs</th>
+            </tr>
+            <tr>
+                <th>Code</th>
+                <th>Désignation</th>
+                <th>Unité</th>
+                <th>Existant en début de gestion</th>
+                <th>Entrée en cours de gestion</th>
+                <th>Qté sortie</th>
+                <th>Qté comptable</th>
+                <th>En attente d'affectation</th>
+                <th>En service</th>
+                <th>En sortie provisoire</th>
+                <th>Total PV</th>
+                <th>Valeur du stock</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in ministry_balance_rows %}
+            <tr>
+                <td><strong>{{ row.account_code }}</strong></td>
+                <td>{{ row.name }}</td>
+                <td>{{ row.unit }}</td>
+                <td>{{ row.qty_in_opening|fmt_qty }}</td>
+                <td>{{ row.qty_in_period|fmt_qty }}</td>
+                <td>{{ row.qty_out|fmt_qty }}</td>
+                <td><strong>{{ row.remaining_qty|fmt_qty }}</strong></td>
+                <td>{{ row.pending_qty|fmt_qty }}</td>
+                <td>{{ row.in_service_qty|fmt_qty }}</td>
+                <td>{{ row.provisional_qty|fmt_qty }}</td>
+                <td><strong>{{ row.total_pv_qty|fmt_qty }}</strong></td>
+                <td><strong>{{ row.final_amount|fmt_amount }}</strong></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="12">Aucune donnée disponible.</td></tr>
+            {% endfor %}
+        </tbody>
+        {% if ministry_balance_rows %}
+        <tfoot>
+            <tr style="font-weight: bold; border-top: 2px solid #333;">
+                <td colspan="3">TOTAL</td>
+                <td>{{ ministry_totals.qty_in_opening|fmt_qty }}</td>
+                <td>{{ ministry_totals.qty_in_period|fmt_qty }}</td>
+                <td>{{ ministry_totals.qty_out|fmt_qty }}</td>
+                <td>{{ ministry_totals.remaining_qty|fmt_qty }}</td>
+                <td>{{ ministry_totals.pending_qty|fmt_qty }}</td>
+                <td>{{ ministry_totals.in_service_qty|fmt_qty }}</td>
+                <td>{{ ministry_totals.provisional_qty|fmt_qty }}</td>
+                <td>{{ ministry_totals.total_pv_qty|fmt_qty }}</td>
+                <td>{{ ministry_totals.final_amount|fmt_amount }}</td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h3>Résumé global </h3>
+    </div>
+    <table>
+        <tbody>
+            <tr>
+                <td>Services consolidés</td>
+                <td><strong>{{ aggregate_data|length }}</strong></td>
+            </tr>
+            <tr>
+                <td>Total matières</td>
+                <td><strong>{{ total_materials }}</strong></td>
+            </tr>
+            <tr>
+                <td>Total bons</td>
+                <td><strong>{{ total_vouchers }}</strong></td>
+            </tr>
+            <tr>
+                <td>Valeur comptable consolidée</td>
+                <td><strong>{{ total_comptable_value|fmt_amount }}</strong></td>
+            </tr>
+            <tr>
+                <td>Valeur de régularisation consolidée</td>
+                <td><strong>{{ total_regulation_value|fmt_amount }}</strong></td>
+            </tr>
+            <tr>
+                <td>Valeur finale consolidée (rapport global)</td>
+                <td><strong>{{ total_final_value|fmt_amount }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+{% endblock %}

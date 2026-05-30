@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}Gestion des utilisateurs{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>Gestion des utilisateurs</h2>
+    </div>
+
+    <p>Création d'utilisateurs et rattachement aux services.</p>
+
+    <div class="panel narrow">
+        <h3>Nouvel utilisateur</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create">
+            {{ form.as_p }}
+            <button class="button" type="submit">Créer l'utilisateur</button>
+        </form>
+    </div>
+
+    {% if edit_form and editing_user %}
+    <div class="panel narrow" style="margin-top: 1rem;">
+        <h3>Modifier l'utilisateur: {{ editing_user.username }}</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update">
+            <input type="hidden" name="user_id" value="{{ editing_user.id }}">
+            {{ edit_form.as_p }}
+            <div class="screen-links">
+                <button class="button" type="submit">Enregistrer les modifications</button>
+                <a class="button secondary" href="{% url 'user_management' %}">Annuler</a>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <h3>Utilisateurs existants</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Utilisateur</th>
+                <th>Rôle</th>
+                <th>Etat</th>
+                <th>Service par défaut</th>
+                <th>Services autorisés</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr>
+                <td>{{ u.username }}</td>
+                <td>{{ u.profile.get_role_display }}</td>
+                <td>{% if u.is_active %}Actif{% else %}Inactif{% endif %}</td>
+                <td>{% if u.profile.default_structure %}{{ u.profile.default_structure.code }}{% else %}-{% endif %}</td>
+                <td>
+                    {% for s in u.profile.assigned_structures.all %}
+                        {{ s.code }}{% if not forloop.last %}, {% endif %}
+                    {% empty %}
+                        -
+                    {% endfor %}
+                </td>
+                <td>
+                    <a class="button secondary" href="{% url 'user_management' %}?edit={{ u.id }}">Modifier</a>
+                    <form method="post" style="display:inline; margin-left: 0.35rem;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                        <button class="button" type="submit" {% if u.id == request.user.id %}disabled{% endif %}>Supprimer</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6">Aucun utilisateur.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

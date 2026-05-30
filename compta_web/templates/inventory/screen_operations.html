@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Écran 2 — Opérations{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="screen-title">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Écran 2 — Opérations comptables
+            </h2>
+            <p class="screen-desc">Saisie et consultation des écritures comptables.</p>
+        </div>
+        <a class="button menu-primary" href="{% url 'menu' %}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Accueil
+        </a>
+    </div>
+
+    {% if current_fiscal_year and current_fiscal_year.is_closed %}
+    <div class="alert alert-warning">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span><strong>Exercice {{ current_fiscal_year.year }} clôturé</strong> — les écritures sont en lecture seule.</span>
+    </div>
+    {% endif %}
+
+    <div class="nav-cards">
+        <a class="nav-card" href="{% url 'user_guide' %}?source=screen2">
+            <div class="nav-card-icon" style="background: rgba(17,97,73,0.10); color: var(--success);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Guide d'utilisation</strong>
+                <span>Manuel complet du logiciel.</span>
+            </div>
+        </a>
+
+        <a class="nav-card" href="{% url 'materials' %}">
+            <div class="nav-card-icon" style="background: rgba(234,179,8,0.10); color: #ca8a04;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Nomenclature</strong>
+                <span>Liste des comptes de matières de la structure.</span>
+            </div>
+        </a>
+
+        <a class="nav-card" href="{% url 'voucher_list' %}">
+            <div class="nav-card-icon" style="background: rgba(59,130,246,0.10); color: #3b82f6;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Liste des bons</strong>
+                <span>Rechercher et consulter les bons existants.</span>
+            </div>
+        </a>
+
+        {% if current_fiscal_year and current_fiscal_year.is_closed %}
+        <div class="nav-card nav-card--disabled">
+            <div class="nav-card-icon" style="background: rgba(107,114,128,0.10); color: var(--muted);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Nouveau bon</strong>
+                <span class="text-warning">Verrouillé — exercice clôturé.</span>
+            </div>
+        </div>
+        {% else %}
+        <a class="nav-card nav-card--highlight" href="{% url 'voucher_create' %}">
+            <div class="nav-card-icon" style="background: rgba(138,75,8,0.12); color: var(--accent);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Nouveau bon</strong>
+                <span>Saisir un bon d'entrée, sortie définitive ou provisoire.</span>
+            </div>
+        </a>
+        {% endif %}
+
+        <a class="nav-card" href="{% url 'journal' %}">
+            <div class="nav-card-icon" style="background: rgba(139,92,246,0.10); color: #8b5cf6;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Livre-journal</strong>
+                <span>Journal chronologique de toutes les écritures.</span>
+            </div>
+        </a>
+
+        <a class="nav-card" href="{% url 'ledger' %}">
+            <div class="nav-card-icon" style="background: rgba(16,185,129,0.10); color: #059669;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Grand livre</strong>
+                <span>Historique détaillé par compte de matière.</span>
+            </div>
+        </a>
+
+        <a class="nav-card" href="{% url 'recap' %}">
+            <div class="nav-card-icon" style="background: rgba(138,75,8,0.10); color: var(--accent);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Relevé récapitulatif</strong>
+                <span>Balance des entrées, sorties et soldes (Modèle 20).</span>
+            </div>
+        </a>
+
+        {% if current_fiscal_year and current_fiscal_year.is_closed %}
+        <div class="nav-card nav-card--disabled">
+            <div class="nav-card-icon" style="background: rgba(107,114,128,0.10); color: var(--muted);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>PV de recensement</strong>
+                <span class="text-warning">Verrouillé — exercice clôturé.</span>
+            </div>
+        </div>
+        {% else %}
+        <a class="nav-card" href="{% url 'pv_recensement' %}">
+            <div class="nav-card-icon" style="background: rgba(236,72,153,0.10); color: #db2777;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>PV de recensement</strong>
+                <span>Saisie de l'inventaire physique (Modèle 21).</span>
+            </div>
+        </a>
+        {% endif %}
+
+        <a class="nav-card" href="{% url 'final_report' %}">
+            <div class="nav-card-icon" style="background: rgba(156,47,47,0.10); color: var(--error);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Rapport final de gestion</strong>
+                <span>Bilan, régularisations et balance générale (Modèle 22).</span>
+            </div>
+        </a>
+
+        <a class="nav-card" href="{% url 'dashboard' %}">
+            <div class="nav-card-icon" style="background: rgba(17,97,73,0.10); color: var(--success);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Qualité des données</strong>
+                <span>Indicateurs, anomalies et tableau de bord.</span>
+            </div>
+        </a>
+    </div>
+</section>
+{% endblock %}

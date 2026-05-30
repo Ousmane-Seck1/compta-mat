@@ -1,0 +1,4 @@
+openpyxl>=3.1.5
+Django>=5.2
+reportlab>=4.2.2
+num2words>=0.5.14

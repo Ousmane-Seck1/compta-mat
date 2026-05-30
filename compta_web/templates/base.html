@@ -1,0 +1,74 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Comptabilité des Matières{% endblock %}</title>
+    <link rel="icon" href="{% static 'inventory/favicon.svg' %}" type="image/svg+xml">
+    <link rel="stylesheet" href="{% static 'inventory/style.css' %}">
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- jQuery (obligatoire pour Select2) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+</head>
+<body>
+    <header class="site-header" style="position: relative;">
+        <img src="{% static 'inventory/logo_gem.png' %}" alt="Logo GeM" style="position: absolute; top: 0.5rem; left: 0.5rem; height: 80px; width: auto; z-index: 10;">
+        <div style="margin-left: 95px;">
+            <h1>Comptabilité des Matières</h1>
+            <p>Logiciel de gestion des matières</p>
+        </div>
+        {% if request.current_structure and request.current_structure.logo %}
+        <p style="margin-top: 0.45rem;">
+            <img src="{{ request.current_structure.logo.url }}" alt="Logo {{ request.current_structure.code }}" style="max-height: 52px; width: auto;">
+        </p>
+        {% endif %}
+        {% if request.user.is_authenticated %}
+        <div class="user-box">
+            <span>{{ request.user.username }}</span>
+            <a class="button secondary" href="{% url 'profile' %}">Profil</a>
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button class="button menu-primary" type="submit">Déconnexion</button>
+            </form>
+        </div>
+        {% endif %}
+    </header>
+    {% if request.user.is_authenticated and request.resolver_match %}
+    {% with current_url=request.resolver_match.url_name %}
+    {% if current_url == 'dashboard' or current_url == 'materials' or current_url == 'voucher_create' or current_url == 'voucher_list' or current_url == 'voucher_detail' or current_url == 'journal' or current_url == 'ledger' or current_url == 'recap' %}
+    <nav class="site-nav">
+        <span class="nav-screen-label">Ecran 2 - Opérations</span>
+        <a class="menu-primary" href="{% url 'menu' %}">Accueil</a>
+        <a class="menu-primary" href="{% url 'screen_operations' %}">Menu Ecran 2</a>
+        <a class="menu-secondary" href="{% url 'select_structure' %}">Service / Exercice</a>
+    </nav>
+    {% elif current_url == 'select_structure' or current_url == 'settings' or current_url == 'profile' or current_url == 'central_recap' or current_url == 'quarterly_central_recap' or current_url == 'user_management' or current_url == 'screen_documents' or current_url == 'document_security_logs' %}
+    <nav class="site-nav">
+        <span class="nav-screen-label">Ecran 1 - Administration</span>
+        <a class="menu-primary" href="{% url 'menu' %}">Accueil</a>
+        <a class="menu-primary" href="{% url 'screen_admin' %}">Menu Ecran 1</a>
+        <a class="menu-secondary" href="{% url 'select_structure' %}">Service / Exercice</a>
+        {% if request.current_structure %}
+        <span class="nav-screen-label">{{ request.current_structure.code }}{% if request.current_fiscal_year %} • {{ request.current_fiscal_year.year }}{% endif %}</span>
+        {% endif %}
+    </nav>
+    {% endif %}
+    {% endwith %}
+    {% endif %}
+    <main class="container">
+        {% if messages %}
+        <section class="messages">
+            {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </section>
+        {% endif %}
+        {% block content %}{% endblock %}
+        {% block extra_js %}{% endblock %}
+    </main>
+</body>
+</html>

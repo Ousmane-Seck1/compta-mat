@@ -1,0 +1,155 @@
+﻿{% extends 'base.html' %}
+{% load inventory_filters %}
+{% load l10n %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>PV de recensement</h2>
+        <div class="print-actions no-print">
+            <button type="button" class="button secondary" onclick="window.print()">Imprimer</button>
+            <a class="button secondary" href="{% url 'pv_recensement_pdf' %}">PDF</a>
+            <a class="button secondary" href="{% url 'pv_recensement_excel' %}">Excel</a>
+            <a class="button secondary" href="{% url 'recap' %}">Retour au relevé récapitulatif</a>
+        </div>
+    </div>
+
+    <div class="official-header" style="margin-bottom: 0.9rem;">
+        <div>
+            {% if print_logo_url %}
+            <div style="margin-bottom: 0.4rem;">
+                <img src="{{ print_logo_url }}" alt="Logo" style="max-height: 58px; width: auto;">
+            </div>
+            {% endif %}
+            <strong>{{ country }}</strong><br>
+            {{ ministry }}<br>
+            {{ structure_label }} {{ structure_value }}<br>
+            {% if address %}Adresse : {{ address }}<br>{% endif %}
+            {% if phone %}Téléphone : {{ phone }}<br>{% endif %}
+            {% if email %}Email : {{ email }}{% endif %}
+        </div>
+        <div class="official-meta">
+            <div>Modèle 21</div>
+            <div>Année fiscale: {{ fiscal_year }}</div>
+        </div>
+    </div>
+
+    <p style="font-size: 0.9rem; color: var(--muted);">
+        <strong>Aide :</strong> l'<strong>écart</strong> est calculé comme <strong>Total PV - Quantité comptable</strong>. Les écarts alimentent ensuite les régularisations du rapport final.
+    </p>
+
+    <form method="post">
+    {% csrf_token %}
+    <table>
+        <thead>
+            <tr>
+                <th>Compte</th>
+                <th>Matières</th>
+                <th>Qté restante (relevé)</th>
+                <th>Matières en attente d'affectation</th>
+                <th>Matières en service</th>
+                <th>Matières en sortie provisoire</th>
+                <th>Total</th>
+                <th>En plus</th>
+                <th>En moins</th>
+                <th>PU (CMUP)</th>
+                <th>Valeur de la différence</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row, form in inventory_forms %}
+            <tr>
+                <td>{{ row.account_code }}</td>
+                <td>{{ row.name }}</td>
+                <td>{{ row.remaining_qty|fmt_qty }}</td>
+                <td>
+                    {% if can_edit %}
+                    <input type="number" name="{{ form.pending_qty.html_name }}"
+                              value="{{ form.pending_qty.value|default_if_none:''|blank_if_zero|unlocalize }}" step="1" min="0">
+                    {% if form.pending_qty.errors %}
+                        <div class="form-error">{{ form.pending_qty.errors.0 }}</div>
+                    {% endif %}
+                    {% else %}
+                    {{ form.pending_qty.value|default_if_none:''|fmt_qty }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if can_edit %}
+                    <input type="number" name="{{ form.in_service_qty.html_name }}"
+                              value="{{ form.in_service_qty.value|default_if_none:''|blank_if_zero|unlocalize }}" step="1" min="0">
+                    {% if form.in_service_qty.errors %}
+                        <div class="form-error">{{ form.in_service_qty.errors.0 }}</div>
+                    {% endif %}
+                    {% else %}
+                    {{ form.in_service_qty.value|default_if_none:''|fmt_qty }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if can_edit %}
+                    <input type="number" name="{{ form.provisional_qty.html_name }}"
+                              value="{{ form.provisional_qty.value|default_if_none:''|blank_if_zero|unlocalize }}" step="1" min="0">
+                    {% if form.provisional_qty.errors %}
+                        <div class="form-error">{{ form.provisional_qty.errors.0 }}</div>
+                    {% endif %}
+                    {% else %}
+                    {{ form.provisional_qty.value|default_if_none:''|fmt_qty }}
+                    {% endif %}
+                </td>
+                <td>{% if row.pv_is_filled %}{{ row.inventory_total_qty|fmt_qty }}{% endif %}</td>
+                <td>{% if row.pv_is_filled %}{{ row.gap_plus|fmt_qty }}{% endif %}</td>
+                <td{% if row.pv_is_filled and row.gap_minus %} style="color:red;font-weight:bold"{% endif %}>
+                    {% if row.pv_is_filled %}{{ row.gap_minus|fmt_qty }}{% endif %}
+                </td>
+                <td>{{ row.cmup|fmt_amount }}</td>
+                <td{% if row.pv_is_filled and row.gap_minus %} style="color:red;font-weight:bold"{% endif %}>
+                    {% if row.pv_is_filled %}{{ row.inventory_gap_value|fmt_amount }}{% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="11">Aucune donnee disponible.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if can_edit and not can_write %}
+    <div class="no-print" style="margin-top: 15px; color: #9c2f2f;">
+        <strong>Exercice cloture :</strong> enregistrement du PV desactive.
+    </div>
+    {% endif %}
+    {% if can_write %}
+    <div class="no-print" style="margin-top: 15px;">
+        <button class="button" type="submit">Enregistrer le PV complet</button>
+    </div>
+    {% endif %}
+    </form>
+
+    <div style="margin-top: 1rem; font-size: 0.9rem;">
+        <p><strong>Nom, qualité et signature des membres de la commission de recensement :</strong></p>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 35%;">Nom</th>
+                    <th style="width: 35%;">Qualité</th>
+                    <th style="width: 30%;">Signature</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="height: 2.4rem;"></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td style="height: 2.4rem;"></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td style="height: 2.4rem;"></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

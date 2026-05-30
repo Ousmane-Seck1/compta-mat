@@ -1,0 +1,55 @@
+
+{% extends 'base.html' %}
+{% load static %}
+{% load inventory_filters %}
+
+{% block content %}
+<section class="panel">
+    <h2>Grand livre</h2>
+    <form method="get" class="inline-form">
+        <label for="material">Matière</label>
+        <select name="material" id="material">
+            {% for material in materials %}
+            <option value="{{ material.account_code }}" {% if material.account_code == selected_code %}selected{% endif %}>{{ material.account_code }} - {{ material.name }}</option>
+            {% endfor %}
+        </select>
+        <button class="button" type="submit">Afficher</button>
+    </form>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>N°Bon</th>
+                <th>Type</th>
+                <th>Origine / destination</th>
+                <th>Entrée</th>
+                <th>Sortie</th>
+                <th>Prix unitaire</th>
+                <th>Existant</th>
+                <th>Montant existant</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in ledger %}
+            <tr>
+                <td>{{ row.date }}</td>
+                <td>{{ row.voucher_number }}</td>
+                <td>{{ row.voucher_type }}</td>
+                <td>{{ row.designation }}</td>
+                <td>{{ row.entry_qty|fmt_qty }}</td>
+                <td>{{ row.exit_qty|fmt_qty }}</td>
+                <td>{{ row.unit_price|fmt_amount }}</td>
+                <td>{{ row.running_qty|fmt_qty }}</td>
+                <td>{{ row.running_amount|fmt_amount }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="9">Aucun mouvement pour cette matière.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'inventory/select2_init.js' %}"></script>
+{% endblock %}

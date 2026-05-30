@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Écran 1 — Administration{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2 class="screen-title">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Écran 1 — Administration
+            </h2>
+            <p class="screen-desc">Configuration et pilotage du service.</p>
+        </div>
+        <a class="button menu-primary" href="{% url 'menu' %}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Accueil
+        </a>
+    </div>
+
+    <div class="nav-cards">
+        {% if is_admin %}
+        <a class="nav-card" href="/admin/">
+            <div class="nav-card-icon" style="background: rgba(138,75,8,0.10); color: var(--accent);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Administration Django</strong>
+                <span>Accès direct au panneau d'administration.</span>
+            </div>
+        </a>
+        {% endif %}
+
+        <a class="nav-card" href="{% url 'user_guide' %}?source=screen1">
+            <div class="nav-card-icon" style="background: rgba(17,97,73,0.10); color: var(--success);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Guide d'utilisation</strong>
+                <span>Manuel complet du logiciel.</span>
+            </div>
+        </a>
+
+        <a class="nav-card" href="{% url 'select_structure' %}">
+            <div class="nav-card-icon" style="background: rgba(59,130,246,0.10); color: #3b82f6;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Service / Exercice</strong>
+                <span>Changer de structure ou d'exercice fiscal.</span>
+            </div>
+        </a>
+
+        {% if is_admin %}
+        <a class="nav-card" href="{% url 'user_management' %}">
+            <div class="nav-card-icon" style="background: rgba(139,92,246,0.10); color: #8b5cf6;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Gestion des utilisateurs</strong>
+                <span>Créer, modifier ou supprimer des comptes.</span>
+            </div>
+        </a>
+
+        <a class="nav-card" href="{% url 'nomenclature_admin' %}">
+            <div class="nav-card-icon" style="background: rgba(234,179,8,0.10); color: #ca8a04;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Nomenclature centrale</strong>
+                <span>Gérer le référentiel des codes de comptes.</span>
+            </div>
+        </a>
+
+        <a class="nav-card" href="{% url 'document_security_logs' %}">
+            <div class="nav-card-icon" style="background: rgba(156,47,47,0.10); color: var(--error);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Journal de sécurité</strong>
+                <span>Évènements de sécurité des documents.{% if recent_security_rejections_count %} <span class="badge badge-alert">{{ recent_security_rejections_count }} / 24h</span>{% endif %}</span>
+            </div>
+        </a>
+        {% endif %}
+
+        <a class="nav-card" href="{% url 'settings' %}">
+            <div class="nav-card-icon" style="background: rgba(107,114,128,0.10); color: var(--muted);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Paramètres</strong>
+                <span>Logo de la structure et préférences.</span>
+            </div>
+        </a>
+
+        {% if is_admin %}
+        <a class="nav-card" href="{% url 'central_recap' %}">
+            <div class="nav-card-icon" style="background: rgba(17,97,73,0.10); color: var(--success);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Rapport central</strong>
+                <span>Vision consolidée de toutes les structures.</span>
+            </div>
+        </a>
+
+        <a class="nav-card" href="{% url 'quarterly_central_recap' %}">
+            <div class="nav-card-icon" style="background: rgba(59,130,246,0.10); color: #3b82f6;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M7 7h10v10H7z"/></svg>
+            </div>
+            <div class="nav-card-text">
+                <strong>Consolidation trimestrielle</strong>
+                <span>Rapports T1 à T3 consolidés par service.</span>
+            </div>
+        </a>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

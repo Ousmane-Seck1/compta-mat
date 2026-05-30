@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% load inventory_filters %}
+
+{% block content %}
+<section class="panel">
+    <h2>Livre-journal</h2>
+    <form method="get" class="inline-form no-print">
+        <div>
+            <label for="journal_q">Recherche</label>
+            <input id="journal_q" type="text" name="q" value="{{ filters.q }}" placeholder="Bon, compte, matiere, designation">
+        </div>
+        <div>
+            <label for="journal_type">Type</label>
+            <select id="journal_type" name="voucher_type">
+                <option value="">Tous</option>
+                <option value="entree" {% if filters.voucher_type == 'entree' %}selected{% endif %}>Bon d'entree</option>
+                <option value="sortie_definitive" {% if filters.voucher_type == 'sortie_definitive' %}selected{% endif %}>Sortie definitive</option>
+                <option value="sortie_provisoire" {% if filters.voucher_type == 'sortie_provisoire' %}selected{% endif %}>Sortie provisoire</option>
+            </select>
+        </div>
+        <div>
+            <label for="journal_date_from">Du</label>
+            <input id="journal_date_from" type="date" name="date_from" value="{{ filters.date_from }}">
+        </div>
+        <div>
+            <label for="journal_date_to">Au</label>
+            <input id="journal_date_to" type="date" name="date_to" value="{{ filters.date_to }}">
+        </div>
+        <div>
+            <label for="journal_sort">Tri</label>
+            <select id="journal_sort" name="sort">
+                <option value="date_asc" {% if filters.sort == 'date_asc' %}selected{% endif %}>Date ancienne</option>
+                <option value="date_desc" {% if filters.sort == 'date_desc' %}selected{% endif %}>Date recente</option>
+            </select>
+        </div>
+        <button class="button" type="submit">Filtrer</button>
+    </form>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>N°Bon</th>
+                <th>Type</th>
+                <th>Compte</th>
+                <th>Matière</th>
+                <th>Quantité</th>
+                <th>Unité</th>
+                <th>Prix</th>
+                <th>Montant</th>
+                <th>Origine / destination</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.date }}</td>
+                <td>{{ row.number }}</td>
+                <td>{{ row.type }}</td>
+                <td>{{ row.account_code }}</td>
+                <td>{{ row.material_name }}</td>
+                <td>{{ row.quantity|fmt_qty }}</td>
+                <td>{{ row.unit }}</td>
+                <td>{{ row.unit_price|fmt_amount }}</td>
+                <td>{{ row.amount|fmt_amount }}</td>
+                <td>{{ row.designation }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="10">Aucun mouvement.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if rows.paginator.num_pages > 1 %}
+    <div class="pagination no-print">
+        {% if rows.has_previous %}
+        <a class="button secondary" href="?{{ query_without_page }}{% if query_without_page %}&{% endif %}page={{ rows.previous_page_number }}">Precedent</a>
+        {% endif %}
+        <span>Page {{ rows.number }} / {{ rows.paginator.num_pages }}</span>
+        {% if rows.has_next %}
+        <a class="button secondary" href="?{{ query_without_page }}{% if query_without_page %}&{% endif %}page={{ rows.next_page_number }}">Suivant</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

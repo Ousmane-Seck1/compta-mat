@@ -1,0 +1,28 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Erreur serveur — Comptabilité des Matières</title>
+    <link rel="icon" href="{% static 'inventory/favicon.svg' %}" type="image/svg+xml">
+    <link rel="stylesheet" href="{% static 'inventory/style.css' %}">
+    <style>
+        .error-page { text-align: center; padding: 4rem 1rem; max-width: 520px; margin: 0 auto; }
+        .error-code { font-size: 5rem; font-weight: 700; color: #9c2f2f; margin: 0; line-height: 1; }
+        .error-message { font-size: 1.25rem; color: var(--muted, #666); margin: 1rem 0 2rem; }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div><h1>Comptabilité des Matières</h1></div>
+    </header>
+    <main class="container">
+        <div class="error-page">
+            <p class="error-code">500</p>
+            <p class="error-message">Une erreur interne est survenue. L'équipe technique a été notifiée.</p>
+            <a class="button" href="/">Retour à l'accueil</a>
+        </div>
+    </main>
+</body>
+</html>

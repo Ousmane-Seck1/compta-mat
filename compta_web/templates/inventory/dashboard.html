@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% load inventory_filters %}
+
+{% block title %}Tableau de bord qualité{% endblock %}
+
+{% block content %}
+<section class="panel" style="margin-bottom:0.75rem;">
+    <div class="panel-head">
+        <div>
+            <h2 class="screen-title">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Tableau de bord — Qualité des données
+            </h2>
+        </div>
+        <div class="screen-links no-print" style="gap:0.5rem;">
+            <a class="button secondary" href="{% url 'recap' %}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                Relevé complet
+            </a>
+            <a class="button secondary" href="{% url 'recap_pdf' %}">PDF relevé</a>
+            <a class="button secondary" href="{% url 'pv_recensement_pdf' %}">PDF PV</a>
+            <a class="button secondary" href="{% url 'final_balance_pdf' %}">PDF balance</a>
+        </div>
+    </div>
+</section>
+
+<section class="dashboard-kpi-grid">
+    <article class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(138,75,8,0.10); color:var(--accent);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        </div>
+        <div class="kpi-data">
+            <span class="kpi-value">{{ metrics.materials_count }}</span>
+            <span class="kpi-label">Matières</span>
+        </div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(59,130,246,0.10); color:#3b82f6;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+        </div>
+        <div class="kpi-data">
+            <span class="kpi-value">{{ metrics.vouchers_count }}</span>
+            <span class="kpi-label">Bons</span>
+        </div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(17,97,73,0.10); color:var(--success);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        <div class="kpi-data">
+            <span class="kpi-value">{{ metrics.stock_quantity|fmt_qty }}</span>
+            <span class="kpi-label">Quantité en stock</span>
+        </div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(234,179,8,0.10); color:#ca8a04;">
+            <!-- Icône coffre (box) -->
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="7" width="18" height="13" rx="2"/>
+                <path d="M16 3v4M8 3v4M3 10h18"/>
+            </svg>
+        </div>
+        <div class="kpi-data">
+            <span class="kpi-value">{{ metrics.stock_value|fmt_amount }}</span>
+            <span class="kpi-label">Valeur du stock</span>
+        </div>
+    </article>
+</section>
+
+<section class="dashboard-kpi-grid">
+    <article class="kpi-card kpi-card--ok">
+        <div class="kpi-icon" style="background:rgba(17,97,73,0.10); color:var(--success);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <div class="kpi-data">
+            <span class="kpi-value">{{ quality_metrics.pv_filled_count }}</span>
+            <span class="kpi-label">PV renseignés</span>
+        </div>
+    </article>
+    <article class="kpi-card {% if quality_metrics.pv_missing_count > 0 %}kpi-card--warn{% else %}kpi-card--ok{% endif %}">
+        <div class="kpi-icon" style="background:rgba(234,179,8,0.10); color:#ca8a04;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="kpi-data">
+            <span class="kpi-value">{{ quality_metrics.pv_missing_count }}</span>
+            <span class="kpi-label">PV manquants</span>
+        </div>
+    </article>
+    <article class="kpi-card {% if quality_metrics.nonzero_gap_count > 0 %}kpi-card--warn{% else %}kpi-card--ok{% endif %}">
+        <div class="kpi-icon" style="background:rgba(234,179,8,0.10); color:#ca8a04;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        </div>
+        <div class="kpi-data">
+            <span class="kpi-value">{{ quality_metrics.nonzero_gap_count }}</span>
+            <span class="kpi-label">Écarts non nuls</span>
+        </div>
+    </article>
+    <article class="kpi-card {% if quality_metrics.negative_stock_count > 0 %}kpi-card--danger{% else %}kpi-card--ok{% endif %}">
+        <div class="kpi-icon" style="background:rgba(156,47,47,0.10); color:var(--error);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="kpi-data">
+            <span class="kpi-value">{{ quality_metrics.negative_stock_count }}</span>
+            <span class="kpi-label">Stocks négatifs</span>
+        </div>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+            Stock résumé
+        </h3>
+    </div>
+    
+    <form method="get" class="inline-form">
+        <div>
+            <label for="pv_filter">Filtrer par état PV</label>
+            <select name="pv" id="pv_filter">
+                <option value="all" {% if pv_filter == 'all' %}selected{% endif %}>Tous</option>
+                <option value="filled" {% if pv_filter == 'filled' %}selected{% endif %}>PV renseigné</option>
+                <option value="missing" {% if pv_filter == 'missing' %}selected{% endif %}>PV manquant</option>
+            </select>
+        </div>
+        <button type="submit" class="button">Filtrer</button>
+    </form>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Compte</th>
+                <th>Matière</th>
+                <th>Unité</th>
+                <th>État PV</th>
+                <th>Qté restante</th>
+                <th>Montant restant</th>
+                <th>CMUP</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in summary %}
+            <tr>
+                <td>{{ item.account_code }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.unit }}</td>
+                <td>
+                    {% if item.pv_is_filled %}
+                    <span class="badge badge-success">✓ Renseigné</span>
+                    {% else %}
+                    <span class="badge badge-alert">✗ Manquant</span>
+                    {% endif %}
+                </td>
+                <td>{{ item.remaining_qty|fmt_qty }}</td>
+                <td>{{ item.remaining_amount|fmt_amount }}</td>
+                <td>{{ item.cmup|fmt_amount }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--muted);">Aucune donnée disponible.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

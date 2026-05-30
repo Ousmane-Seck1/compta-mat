@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>Nomenclature des comptes</h2>
+        <div class="screen-links no-print">
+            {% if is_admin %}
+            <a class="button menu-secondary" href="{% url 'nomenclature_admin' %}">Gerer la nomenclature</a>
+            {% endif %}
+        </div>
+    </div>
+    <p style="font-size:0.9em;color:#666;">La nomenclature est définie par l'administrateur et est commune à tous les services.</p>
+    <form method="get" class="inline-form no-print">
+        <div>
+            <label for="materials_q">Recherche</label>
+            <input id="materials_q" type="text" name="q" value="{{ filters.q }}" placeholder="Code, nom ou groupe">
+        </div>
+        <div>
+            <label for="materials_sort">Tri</label>
+            <select id="materials_sort" name="sort">
+                <option value="code_asc" {% if filters.sort == 'code_asc' %}selected{% endif %}>Code croissant</option>
+                <option value="code_desc" {% if filters.sort == 'code_desc' %}selected{% endif %}>Code décroissant</option>
+                <option value="name_asc" {% if filters.sort == 'name_asc' %}selected{% endif %}>Nom A-Z</option>
+                <option value="name_desc" {% if filters.sort == 'name_desc' %}selected{% endif %}>Nom Z-A</option>
+                <option value="group_asc" {% if filters.sort == 'group_asc' %}selected{% endif %}>Groupe croissant</option>
+                <option value="group_desc" {% if filters.sort == 'group_desc' %}selected{% endif %}>Groupe décroissant</option>
+            </select>
+        </div>
+        <button class="button" type="submit">Filtrer</button>
+    </form>
+    <table>
+        <thead>
+            <tr>
+                <th>Compte</th>
+                <th>Nom</th>
+                <th>Unité</th>
+                <th>Groupe</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for material in materials %}
+            <tr>
+                <td>{{ material.account_code }}</td>
+                <td>{{ material.name }}</td>
+                <td>{{ material.unit }}</td>
+                <td>{{ material.group_code }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">Aucun compte enregistré.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if materials.paginator.num_pages > 1 %}
+    <div class="pagination no-print">
+        {% if materials.has_previous %}
+        <a class="button secondary" href="?{{ query_without_page }}{% if query_without_page %}&{% endif %}page={{ materials.previous_page_number }}">Precedent</a>
+        {% endif %}
+        <span>Page {{ materials.number }} / {{ materials.paginator.num_pages }}</span>
+        {% if materials.has_next %}
+        <a class="button secondary" href="?{{ query_without_page }}{% if query_without_page %}&{% endif %}page={{ materials.next_page_number }}">Suivant</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

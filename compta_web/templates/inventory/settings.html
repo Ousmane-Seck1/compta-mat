@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="panel narrow">
+    <h2>Paramètres d'impression et d'entête</h2>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <p><label>Pays <input type="text" name="country" value="{{ values.country }}"></label></p>
+        <p><label>Ministère <input type="text" name="ministry" value="{{ values.ministry }}"></label></p>
+        <p><label>Libellé structure <input type="text" name="structure_label" value="{{ values.structure_label }}"></label></p>
+        <p><label>Adresse <input type="text" name="address" value="{{ values.address }}"></label></p>
+        <p><label>Téléphone <input type="text" name="phone" value="{{ values.phone }}"></label></p>
+        <p><label>Email <input type="text" name="email" value="{{ values.email }}"></label></p>
+        <p><label>Année fiscale <input type="text" name="fiscal_year" value="{{ values.fiscal_year }}"></label></p>
+
+        <hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--border);">
+        <p><strong>Logo du service courant</strong></p>
+        {% if current_structure %}
+            <p>Service : <strong>{{ current_structure.code }} - {{ current_structure.name }}</strong></p>
+            {% if current_structure.logo %}
+            <p>
+                <img src="{{ current_structure.logo.url }}" alt="Logo {{ current_structure.code }}" style="max-height: 90px; width: auto; border: 1px solid var(--border); padding: 0.3rem; background: #fff;">
+            </p>
+            <p>
+                <label style="display: inline-flex; gap: 0.4rem; align-items: center; width: auto;">
+                    <input type="checkbox" name="remove_logo" value="1" style="width: auto;"> Supprimer le logo actuel
+                </label>
+            </p>
+            {% endif %}
+            <p><label>Télécharger un logo (PNG/JPG/SVG) <input type="file" name="structure_logo" accept="image/*"></label></p>
+        {% else %}
+            <p style="color: var(--error);">Aucun service n'est selectionné. Choisissez d'abord un service dans "Service / Exercice".</p>
+        {% endif %}
+
+        <button class="button" type="submit">Enregistrer</button>
+    </form>
+</section>
+{% endblock %}

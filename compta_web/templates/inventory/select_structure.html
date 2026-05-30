@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Sélectionner un Service{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Sélectionner un Service et un Exercice</h1>
+    <p class="help-text">Cette page sert uniquement à choisir le service et l'exercice actif. La création des services et exercices se fait dans Admin.</p>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" class="form-selection">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="id_structure">Service:</label>
+            <select name="structure_id" id="id_structure" class="form-control" required>
+                <option value="">-- Choisir un service --</option>
+                {% for structure in available_structures %}
+                    <option value="{{ structure.id }}" {% if current_structure.id == structure.id %}selected{% endif %}>
+                        {{ structure.code }} - {{ structure.name }}
+                        {% if structure.region %} ({{ structure.region }}){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="id_fiscal_year">Exercice Comptable:</label>
+            <select name="fiscal_year_id" id="id_fiscal_year" class="form-control">
+                <option value="">-- Exercice courant --</option>
+                {% for fy in fiscal_years %}
+                    <option value="{{ fy.id }}" {% if current_fiscal_year.id == fy.id %}selected{% endif %}>
+                        {{ fy.year }} ({{ fy.start_date }} - {{ fy.end_date }}){% if fy.is_active %} (Actif){% endif %}{% if fy.is_closed %} (Clôturé){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Valider la Sélection</button>
+        <a href="{% url 'screen_admin' %}" class="btn btn-secondary">Retour</a>
+    </form>
+
+    {% if current_structure %}
+        <div class="info-box" style="margin-top: 30px; padding: 15px; background-color: #f0f0f0; border-left: 4px solid #007bff;">
+            <p><strong>Service courant:</strong> {{ current_structure.code }} - {{ current_structure.name }}</p>
+            {% if current_fiscal_year %}
+                <p><strong>Exercice courant:</strong> {{ current_fiscal_year.year }}</p>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if is_superuser and current_structure %}
+        <div class="info-box" style="margin-top: 20px; padding: 15px; background-color: #fff3cd; border-left: 4px solid #e0a800;">
+            <h3 style="margin-top: 0;">Reouvrir un exercice cloture (superuser)</h3>
+            <p class="help-text" style="margin-top: 4px;">Cette action rend l'exercice de nouveau modifiable pour ce service.</p>
+            {% if closed_fiscal_years %}
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+                    {% for fy in closed_fiscal_years %}
+                        <form method="post" style="display: inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="reopen_fiscal_year">
+                            <input type="hidden" name="structure_id" value="{{ current_structure.id }}">
+                            <input type="hidden" name="reopen_fiscal_year_id" value="{{ fy.id }}">
+                            <button type="submit" class="btn btn-warning">Reouvrir {{ fy.year }}</button>
+                        </form>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>Aucun exercice cloture pour ce service.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+{{ fiscal_years_by_structure|json_script:"fiscal-years-by-structure" }}
+
+<script>
+const fiscalYearsByStructure = JSON.parse(document.getElementById("fiscal-years-by-structure").textContent);
+const structureSelect = document.getElementById("id_structure");
+const fiscalYearSelect = document.getElementById("id_fiscal_year");
+const currentFiscalYearId = "{% if current_fiscal_year %}{{ current_fiscal_year.id }}{% endif %}";
+
+function renderFiscalYears(structureId) {
+    const items = fiscalYearsByStructure[structureId] || [];
+    fiscalYearSelect.innerHTML = '<option value="">-- Exercice courant --</option>';
+
+    for (const item of items) {
+        const option = document.createElement("option");
+        option.value = String(item.id);
+        option.textContent = `${item.year} (${item.start_date} - ${item.end_date})${item.is_active ? ' (Actif)' : ''}${item.is_closed ? ' (Clôturé)' : ''}`;
+        if (currentFiscalYearId && option.value === currentFiscalYearId) {
+            option.selected = true;
+        }
+        fiscalYearSelect.appendChild(option);
+    }
+}
+
+structureSelect.addEventListener("change", () => {
+    renderFiscalYears(structureSelect.value);
+});
+
+renderFiscalYears(structureSelect.value);
+</script>
+
+<style>
+.form-selection {
+    max-width: 500px;
+    margin: 20px 0;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.btn {
+    padding: 10px 20px;
+    margin-right: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-secondary:hover {
+    background-color: #545b62;
+}
+
+.btn-warning {
+    background-color: #e0a800;
+    color: #1f1f1f;
+}
+
+.btn-warning:hover {
+    background-color: #c48f00;
+}
+
+.info-box p {
+    margin: 10px 0;
+}
+
+.help-text {
+    margin: 10px 0 18px;
+    color: #495057;
+}
+</style>
+{% endblock %}

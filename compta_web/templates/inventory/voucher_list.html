@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load inventory_filters %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>Bons enregistrés</h2>
+        <a class="button" href="{% url 'voucher_create' %}">Nouveau bon</a>
+    </div>
+    <form method="get" class="inline-form no-print">
+        <div>
+            <label for="voucher_q">Recherche</label>
+            <input id="voucher_q" type="text" name="q" value="{{ filters.q }}" placeholder="Numero, commentaire, destination">
+        </div>
+        <div>
+            <label for="voucher_type">Type</label>
+            <select id="voucher_type" name="voucher_type">
+                <option value="">Tous</option>
+                <option value="entree" {% if filters.voucher_type == 'entree' %}selected{% endif %}>Bon d'entree</option>
+                <option value="sortie_definitive" {% if filters.voucher_type == 'sortie_definitive' %}selected{% endif %}>Sortie definitive</option>
+                <option value="sortie_provisoire" {% if filters.voucher_type == 'sortie_provisoire' %}selected{% endif %}>Sortie provisoire</option>
+            </select>
+        </div>
+        <div>
+            <label for="temp_return_status">Statut provisoire</label>
+            <select id="temp_return_status" name="temp_return_status">
+                <option value="" {% if not filters.temp_return_status %}selected{% endif %}>Tous</option>
+                <option value="en_cours" {% if filters.temp_return_status == 'en_cours' %}selected{% endif %}>En cours</option>
+                <option value="retourne" {% if filters.temp_return_status == 'retourne' %}selected{% endif %}>Retourne</option>
+            </select>
+        </div>
+        <div>
+            <label for="voucher_date_from">Du</label>
+            <input id="voucher_date_from" type="date" name="date_from" value="{{ filters.date_from }}">
+        </div>
+        <div>
+            <label for="voucher_date_to">Au</label>
+            <input id="voucher_date_to" type="date" name="date_to" value="{{ filters.date_to }}">
+        </div>
+        <div>
+            <label for="voucher_sort">Tri</label>
+            <select id="voucher_sort" name="sort">
+                <option value="date_desc" {% if filters.sort == 'date_desc' %}selected{% endif %}>Date récente</option>
+                <option value="date_asc" {% if filters.sort == 'date_asc' %}selected{% endif %}>Date ancienne</option>
+                <option value="number_desc" {% if filters.sort == 'number_desc' %}selected{% endif %}>Numéro décroissant</option>
+                <option value="number_asc" {% if filters.sort == 'number_asc' %}selected{% endif %}>Numéro croissant</option>
+            </select>
+        </div>
+        <button class="button" type="submit">Filtrer</button>
+    </form>
+    <table>
+        <thead>
+            <tr>
+                <th>Numéro</th>
+                <th>Type</th>
+                <th>Statut provisoire</th>
+                <th>Date</th>
+                <th>Origine / destination </th>
+                <th>Total</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for voucher in vouchers %}
+            <tr>
+                <td>{{ voucher.number }}</td>
+                <td>{{ voucher.get_voucher_type_display }}</td>
+                <td>
+                    {% if voucher.voucher_type == 'sortie_provisoire' %}
+                        {% if voucher.temp_return_status == 'retourne' %}
+                            <span class="badge" style="background: #116149; color: #fff;">Retourne</span>
+                        {% else %}
+                            <span class="badge" style="background: #9c2f2f; color: #fff;">En cours</span>
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ voucher.operation_date }}</td>
+                <td>{{ voucher.source_or_destination }}</td>
+                <td>{{ voucher.total_amount|fmt_amount }}</td>
+                <td><a class="button secondary" href="{% url 'voucher_detail' voucher.pk %}">Ouvrir</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7">Aucun bon enregistré.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if vouchers.paginator.num_pages > 1 %}
+    <div class="pagination no-print">
+        {% if vouchers.has_previous %}
+        <a class="button secondary" href="?{{ query_without_page }}{% if query_without_page %}&{% endif %}page={{ vouchers.previous_page_number }}">Precedent</a>
+        {% endif %}
+        <span>Page {{ vouchers.number }} / {{ vouchers.paginator.num_pages }}</span>
+        {% if vouchers.has_next %}
+        <a class="button secondary" href="?{{ query_without_page }}{% if query_without_page %}&{% endif %}page={{ vouchers.next_page_number }}">Suivant</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

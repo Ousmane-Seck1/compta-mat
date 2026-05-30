@@ -1,0 +1,408 @@
+{% extends 'base.html' %}
+{% load l10n %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>Nouveau bon</h2>
+        <div class="screen-links no-print">
+            <a class="button secondary" href="{% url 'final_balance_pdf' %}">PDF balance générale</a>
+        </div>
+    </div>
+    {% if not can_edit %}
+    <p>Votre profil est en consultation seulement</p>
+    {% elif is_fiscal_year_closed %}
+    <p style="color: #9c2f2f;"><strong>Exercice clôturé :</strong> la création de bons est désactivée.</p>
+    {% endif %}
+    <p style="font-size: 0.9rem; color: var(--muted);">
+        <strong>Aide :</strong> les sorties peuvent être valorisées au CMUP ou en FIFO selon les textes. Dans cette application, la méthode retenue est le <strong>CMUP</strong> Le système bloque une sortie supérieure au stock disponible.
+    </p>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-grid">
+            {{ form.as_p }}
+        </div>
+        <h3>Lignes du bon</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Matière</th>
+                    <th>Spécification</th>
+                    <th>Quantité</th>
+                    <th>Prix unitaire</th>
+                </tr>
+            </thead>
+            <tbody id="lines-tbody">
+                {% for i in line_range %}
+                <tr>
+                    <td>
+                        <select name="line_material_{{ i }}" id="line_material_{{ i }}" class="material-select">
+                            <option value=""></option>
+                            {% for material in materials_with_cmup %}
+                                <option value="{{ material.id }}" data-cmup="{{ material.cmup|unlocalize }}" {% if posted_lines and posted_lines|length > i and posted_lines.i.material_id == material.id|stringformat:'s' %}selected{% elif selected_material_ids.i == material.id|stringformat:'s' %}selected{% endif %}>
+                                    {{ material.account_code }} - {{ material.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td><input type="text" name="line_specification_{{ i }}" value="{% if posted_lines and posted_lines|length > i %}{{ posted_lines.i.specification }}{% endif %}"></td>
+                    <td><input type="number" step="1" min="0" name="line_quantity_{{ i }}" value="{% if posted_lines and posted_lines|length > i %}{{ posted_lines.i.quantity }}{% elif i == 0 and prefill.quantity %}{{ prefill.quantity }}{% endif %}"></td>
+                    <td><input type="number" step="any" min="0" name="line_unit_price_{{ i }}" value="{% if posted_lines and posted_lines|length > i %}{{ posted_lines.i.unit_price }}{% elif i == 0 and prefill.unit_price %}{{ prefill.unit_price }}{% endif %}"></td>
+                    <td class="no-print"><button type="button" class="remove-line-btn" title="Supprimer cette ligne" style="background:none;border:none;cursor:pointer;color:#9c2f2f;font-size:1.1rem;">✕</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <input type="hidden" name="line_count" id="line_count_input" value="{{ line_range|length }}">
+
+        {% if can_edit and not is_fiscal_year_closed %}
+        <button type="button" id="add-line-btn" class="button secondary" style="margin-top: 0.75rem;">+ Ajouter une ligne</button>
+        {% endif %}
+
+        <div id="comptable-mention" style="margin-top: 2rem; padding: 1rem; border: 1px solid var(--border); border-radius: 12px; background: rgba(255, 253, 248, 0.5); display: none;">
+            <p style="margin: 0 0 1rem;">
+                <strong id="mention-title">Déclaration du comptable:</strong>
+            </p>
+            <p id="mention-text" style="margin: 0; line-height: 1.8;"></p>
+        </div>
+
+        <div style="margin-top: 1rem; margin-bottom: 1rem;">
+            <label for="id_storage_location"><strong>Lieu de stockage / provenance de sortie (magasins)</strong></label>
+            <select id="id_storage_location" name="storage_location_id" style="width: 100%; margin-top: 0.35rem;">
+                <option value="">-- Selectionner un magasin (en attente d'affectation) --</option>
+                {% for location in store_locations %}
+                    <option value="{{ location.id }}" data-location-type="{{ location.location_type }}" {% if selected_store_location_id == location.id|stringformat:'s' %}selected{% endif %}>{{ location.name }}</option>
+                {% endfor %}
+            </select>
+            <p id="storage-place-help" style="margin: 0.4rem 0 0; font-size: 0.9rem; color: var(--muted);"></p>
+        </div>
+
+        {% if can_edit and not is_fiscal_year_closed %}
+        <button class="button" type="submit" style="margin-top: 1rem;">Enregistrer le bon</button>
+        {% endif %}
+    </form>
+</section>
+
+<style>
+    /* Colonne matière très large, autres colonnes étroites et fixes */
+    .panel table {
+        table-layout: fixed;
+        width: 100%;
+        min-width: 900px;
+        max-width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 0;
+    }
+    .panel table th:nth-child(1),
+    .panel table td:nth-child(1) {
+        width: 60%;
+        min-width: 320px;
+        max-width: 800px;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }
+    .select2-container {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+    .panel table select.material-select {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+    .panel table th:nth-child(2),
+    .panel table td:nth-child(2) {
+        width: 13%;
+        min-width: 80px;
+        max-width: 13vw;
+    }
+    .panel table th:nth-child(3),
+    .panel table td:nth-child(3) {
+        width: 13%;
+        min-width: 80px;
+        max-width: 13vw;
+    }
+    .panel table th:nth-child(4),
+    .panel table td:nth-child(4) {
+        width: 14%;
+        min-width: 80px;
+        max-width: 14vw;
+    }
+</style>
+
+<script>
+const MATERIALS_DATA = [
+    {% for material in materials_with_cmup %}
+    {
+        "id": "{{ material.id }}",
+        "accountCode": "{{ material.account_code|escapejs }}",
+        "label": "{{ material.account_code|escapejs }} - {{ material.name|escapejs }}",
+        "cmup": "{{ material.cmup|unlocalize }}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Correction Select2 : force la valeur du select natif à l'option selected au chargement
+    setTimeout(function() {
+        document.querySelectorAll('select[name^="line_material_"]').forEach(function(sel) {
+            var selectedOption = sel.querySelector('option[selected]');
+            if (selectedOption) {
+                sel.value = selectedOption.value;
+            }
+            sel.dispatchEvent(new Event('change', {bubbles: true}));
+        });
+        // Synchronise le PU pour toutes les lignes existantes (même si déjà sélectionnées)
+        syncAllUnitPrices();
+    }, 0);
+    const voucherTypeSelect = document.getElementById('id_voucher_type');
+    const storageLocationSelect = document.getElementById('id_storage_location');
+    const storagePlaceHelp = document.getElementById('storage-place-help');
+    const mentionDiv = document.getElementById('comptable-mention');
+    const mentionTitle = document.getElementById('mention-title');
+    const mentionText = document.getElementById('mention-text');
+    const tableBody = document.getElementById('lines-tbody');
+    const lineCountInput = document.getElementById('line_count_input');
+    let lineCount = parseInt(lineCountInput ? lineCountInput.value : '3', 10);
+
+    function isExitVoucher(voucherType) {
+        return voucherType === 'sortie_definitive' || voucherType === 'sortie_provisoire';
+    }
+
+    function normalizeAccountPrefix(accountCode) {
+        return String(accountCode || '').replace(/\s+/g, '').trim().charAt(0);
+    }
+
+    function storeTypeFromPrefix(prefix) {
+        if (prefix === '1') return 'store_equipment';
+        if (prefix === '2') return 'store_supplies';
+        return 'store_products';
+    }
+
+    function selectedStoreCandidates() {
+        const storeTypes = new Set();
+        if (!tableBody) return storeTypes;
+        tableBody.querySelectorAll('select[name^="line_material_"]').forEach(function(select) {
+            const selectedId = select.value;
+            if (!selectedId) return;
+            const material = MATERIALS_DATA.find(function(item) { return item.id === selectedId; });
+            if (!material) return;
+            const prefix = normalizeAccountPrefix(material.accountCode);
+            storeTypes.add(storeTypeFromPrefix(prefix));
+        });
+        return storeTypes;
+    }
+
+    function updateStoragePlacePreview() {
+        if (!voucherTypeSelect || !storageLocationSelect || !storagePlaceHelp) return;
+        const voucherType = voucherTypeSelect.value;
+        const storeTypes = selectedStoreCandidates();
+
+        if (storeTypes.size === 1) {
+            const expectedType = Array.from(storeTypes)[0];
+            const optionToSelect = storageLocationSelect.querySelector(`option[data-location-type="${expectedType}"]`);
+            if (optionToSelect) {
+                storageLocationSelect.value = optionToSelect.value;
+            }
+            if (voucherType === 'entree') {
+                storagePlaceHelp.textContent = 'Magasin de stockage de l\'entree selectionne automatiquement selon la matiere.';
+            } else if (isExitVoucher(voucherType)) {
+                storagePlaceHelp.textContent = 'Magasin de provenance de la sortie selectionne automatiquement selon la matiere.';
+            } else {
+                storagePlaceHelp.textContent = 'Magasin associe a la matiere selectionnee.';
+            }
+        } else if (storeTypes.size > 1) {
+            storageLocationSelect.value = '';
+            storagePlaceHelp.textContent = 'Attention: vos lignes relevent de magasins differents. Saisissez des bons separes par magasin.';
+        } else if (voucherType === 'entree') {
+            storageLocationSelect.value = '';
+            storagePlaceHelp.textContent = 'Selectionnez une matiere pour determiner le magasin de stockage.';
+        } else if (isExitVoucher(voucherType)) {
+            storageLocationSelect.value = '';
+            storagePlaceHelp.textContent = 'Selectionnez une matiere pour determiner le magasin de provenance.';
+        } else {
+            storagePlaceHelp.textContent = '';
+        }
+    }
+
+    function normalizeDecimal(value) {
+        return String(value || '0').replace(',', '.').trim();
+    }
+
+    function syncUnitPriceForLine(index) {
+        const voucherType = voucherTypeSelect ? voucherTypeSelect.value : '';
+        const materialSelect = document.querySelector(`select[name="line_material_${index}"]`);
+        const unitPriceInput = document.querySelector(`input[name="line_unit_price_${index}"]`);
+        if (!materialSelect || !unitPriceInput) return;
+
+        if (!isExitVoucher(voucherType)) {
+            unitPriceInput.readOnly = false;
+            unitPriceInput.style.backgroundColor = '';
+            unitPriceInput.title = '';
+            return;
+        }
+
+        // Correction : détecte l'option sélectionnée même si .value est vide
+        let selected = materialSelect.options[materialSelect.selectedIndex];
+        if ((!materialSelect.value || materialSelect.value === "") && materialSelect.querySelector('option[selected]')) {
+            selected = materialSelect.querySelector('option[selected]');
+        }
+        const cmup = normalizeDecimal(selected ? (selected.dataset.cmup || '0') : '0');
+        if ((materialSelect.value && materialSelect.value !== "") || (selected && selected.value && selected.value !== "")) {
+            unitPriceInput.value = cmup;
+        }
+        unitPriceInput.readOnly = true;
+        unitPriceInput.style.backgroundColor = 'rgba(0, 0, 0, 0.04)';
+        unitPriceInput.title = 'PU verrouille sur le CMUP pour les bons de sortie';
+    }
+
+    function getActiveLineIndices() {
+        const indices = [];
+        if (!tableBody) return indices;
+        tableBody.querySelectorAll('tr').forEach(function(row) {
+            const sel = row.querySelector('select[name^="line_material_"]');
+            if (sel) {
+                const idx = parseInt(sel.name.replace('line_material_', ''), 10);
+                if (!isNaN(idx)) indices.push(idx);
+            }
+        });
+        return indices;
+    }
+
+    function syncAllUnitPrices() {
+        getActiveLineIndices().forEach(function(i) { syncUnitPriceForLine(i); });
+    }
+
+    function buildOptionsHTML() {
+        return MATERIALS_DATA.map(function(m) {
+            return `<option value="${m.id}" data-cmup="${m.cmup}">${m.account_code} - ${m.name}</option>`;
+        }).join('');
+    }
+
+    function addLine() {
+        if (!tableBody) return;
+        const index = lineCount;
+        const row = document.createElement('tr');
+        let options = '<option value=""></option>';
+        MATERIALS_DATA.forEach(function(m) {
+            options += `<option value="${m.id}" data-cmup="${m.cmup}">${m.label}</option>`;
+        });
+        row.innerHTML =
+            `<td><select name="line_material_${index}" class="material-select">${options}</select></td>` +
+            `<td><input type="text" name="line_specification_${index}"></td>` +
+            `<td><input type="number" step="1" min="0" name="line_quantity_${index}"></td>` +
+            `<td><input type="number" step="any" min="0" name="line_unit_price_${index}"></td>` +
+            `<td class="no-print"><button type="button" class="remove-line-btn" title="Supprimer cette ligne" style="background:none;border:none;cursor:pointer;color:#9c2f2f;font-size:1.1rem;">✕</button></td>`;
+        tableBody.appendChild(row);
+        lineCount++;
+        if (lineCountInput) lineCountInput.value = lineCount;
+        // Initialiser Select2 sur la nouvelle ligne (filtrage instantané)
+        if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+            window.jQuery(row.querySelector('select.material-select')).select2({
+                width: '100%',
+                placeholder: 'Rechercher une matière...',
+                allowClear: true,
+                minimumInputLength: 0,
+                language: {
+                    noResults: function() { return "Aucune matière trouvée"; },
+                    inputTooShort: function() { return "Tapez pour filtrer la liste"; }
+                }
+            });
+        }
+        // Synchronise le PU pour toutes les lignes après ajout
+        syncAllUnitPrices();
+    }
+
+    function removeLine(row) {
+        if (!tableBody) return;
+        if (tableBody.querySelectorAll('tr').length <= 1) return;
+        tableBody.removeChild(row);
+        if (lineCountInput) lineCountInput.value = lineCount;
+    }
+
+    const addBtn = document.getElementById('add-line-btn');
+    if (addBtn) addBtn.addEventListener('click', addLine);
+
+    if (tableBody) {
+        // Select2 déclenche 'change' via jQuery : utiliser jQuery.on pour capter l'événement
+        if (window.jQuery) {
+            window.jQuery(tableBody).on('change select2:select select2:clear', 'select.material-select', function() {
+                syncAllUnitPrices();
+                updateStoragePlacePreview();
+            });
+        }
+        // Fallback natif au cas où Select2 n'est pas chargé
+        tableBody.addEventListener('change', function(e) {
+            if (e.target.tagName === 'SELECT' && e.target.name.startsWith('line_material_')) {
+                syncAllUnitPrices();
+                updateStoragePlacePreview();
+            }
+        });
+        tableBody.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-line-btn')) {
+                removeLine(e.target.closest('tr'));
+                // Après suppression, resynchronise tous les PU
+                syncAllUnitPrices();
+                updateStoragePlacePreview();
+            }
+        });
+    }
+
+    function updateMention() {
+        if (!voucherTypeSelect) return;
+        const voucherType = voucherTypeSelect.value;
+        if (voucherType === 'entree') {
+            mentionTitle.textContent = 'Déclaration du comptable:';
+            mentionText.textContent = 'Le comptable des matières, soussigné, déclare ce jour, augmenter mes prises en charge de [nombre d\'unités] unités représentant une valeur de [montant total] Francs.';
+            mentionDiv.style.display = 'block';
+        } else if (voucherType === 'sortie_definitive') {
+            mentionTitle.textContent = 'Déclaration du comptable:';
+            mentionText.textContent = 'Le comptable des matières, soussigné, déclare ce jour, diminuer mes prises en charge de [nombre d\'unités] unités représentant une valeur de [montant total] Francs.';
+            mentionDiv.style.display = 'block';
+        } else if (voucherType === 'sortie_provisoire') {
+            mentionTitle.textContent = 'Engagement du comptable:';
+            mentionText.textContent = 'Le comptable des matières, soussigné, s\'engage à faire diligence pour réintégrer les matières portées au présent bon dans l\'enceinte du service.';
+            mentionDiv.style.display = 'block';
+        } else {
+            mentionDiv.style.display = 'none';
+        }
+    }
+
+    if (voucherTypeSelect) {
+        voucherTypeSelect.addEventListener('change', function() {
+            updateMention();
+            syncAllUnitPrices();
+            updateStoragePlacePreview();
+        });
+        updateMention();
+    }
+
+    // Synchronise tous les PU au chargement initial
+    syncAllUnitPrices();
+    updateStoragePlacePreview();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialise Select2 sur chaque select matière existant au chargement (filtrage instantané)
+    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+        window.jQuery('select.material-select').select2({
+            width: '100%',
+            placeholder: 'Rechercher une matière...',
+            allowClear: true,
+            minimumInputLength: 0,
+            language: {
+                noResults: function() { return "Aucune matière trouvée"; },
+                inputTooShort: function() { return "Tapez pour filtrer la liste"; }
+            }
+        });
+    }
+});
+</script>
+
+<!-- Awesomplete Autocomplete pour matières -->
+<script>
+// Plus d'initialisation Choices.js ici : tout est géré par Select2 ci-dessus
+</script>
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load inventory_filters %}
+
+{% block title %}Bordereaux internes{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Bordereaux internes</h2>
+            <p class="screen-desc">Affectations, mutations et désaffectations enregistrées dans le service.</p>
+        </div>
+        <div class="screen-links">
+            <a class="button secondary" href="{% url 'screen_internal_movements' %}">Écran 3</a>
+            {% if can_edit and not is_fiscal_year_closed %}
+            <a class="button" href="{% url 'internal_movement_create' %}">Nouveau bordereau</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="get" class="form-shell" style="margin-bottom: 1rem;">
+        <div class="form-grid movement-filters-grid" style="gap: 0.65rem; align-items: end;">
+            <p style="grid-column: span 2;">
+                <label for="q"><strong>Recherche</strong></label>
+                <input type="text" id="q" name="q" value="{{ filters.q }}" placeholder="N° ou motif/localisation">
+            </p>
+            <p>
+                <label for="movement_type"><strong>Type</strong></label>
+                <select id="movement_type" name="movement_type">
+                    <option value="">Tous</option>
+                    {% for code, label in movement_type_choices %}
+                    <option value="{{ code }}" {% if filters.movement_type == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </p>
+            <p>
+                <label for="from_location"><strong>Source</strong></label>
+                <select id="from_location" name="from_location">
+                    <option value="">Toutes</option>
+                    {% for location in locations %}
+                    <option value="{{ location.id }}" {% if filters.from_location == location.id|stringformat:'s' %}selected{% endif %}>{{ location.name }}</option>
+                    {% endfor %}
+                </select>
+            </p>
+            <p>
+                <label for="to_location"><strong>Destination</strong></label>
+                <select id="to_location" name="to_location">
+                    <option value="">Toutes</option>
+                    {% for location in locations %}
+                    <option value="{{ location.id }}" {% if filters.to_location == location.id|stringformat:'s' %}selected{% endif %}>{{ location.name }}</option>
+                    {% endfor %}
+                </select>
+            </p>
+            <p>
+                <label for="date_from"><strong>Date début</strong></label>
+                <input type="date" id="date_from" name="date_from" value="{{ filters.date_from }}">
+            </p>
+            <p>
+                <label for="date_to"><strong>Date fin</strong></label>
+                <input type="date" id="date_to" name="date_to" value="{{ filters.date_to }}">
+            </p>
+            <p>
+                <label for="sort"><strong>Tri</strong></label>
+                <select id="sort" name="sort">
+                    <option value="date_desc" {% if filters.sort == 'date_desc' %}selected{% endif %}>Date décroissante</option>
+                    <option value="date_asc" {% if filters.sort == 'date_asc' %}selected{% endif %}>Date croissante</option>
+                    <option value="number_desc" {% if filters.sort == 'number_desc' %}selected{% endif %}>N° décroissant</option>
+                    <option value="number_asc" {% if filters.sort == 'number_asc' %}selected{% endif %}>N° croissant</option>
+                </select>
+            </p>
+        </div>
+        <div style="margin-top: 0.65rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="button" type="submit">Filtrer</button>
+            <a class="button secondary" href="{% url 'internal_movement_list' %}">Réinitialiser</a>
+        </div>
+    </form>
+
+    <style>
+        .movement-filters-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(170px, 1fr));
+            width: 100%;
+        }
+
+        .movement-filters-grid p {
+            margin: 0;
+        }
+
+        @media (max-width: 1100px) {
+            .movement-filters-grid {
+                grid-template-columns: repeat(3, minmax(160px, 1fr));
+            }
+        }
+
+        @media (max-width: 780px) {
+            .movement-filters-grid {
+                grid-template-columns: repeat(2, minmax(150px, 1fr));
+            }
+
+            .movement-filters-grid p {
+                grid-column: span 1 !important;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .movement-filters-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+
+    <table>
+        <thead>
+            <tr>
+                <th>N°</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Lignes</th>
+                <th>Montant</th>
+                <th>PDF</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for movement in movements %}
+            <tr>
+                <td><a href="{% url 'internal_movement_detail' movement.id %}">{{ movement.number }}</a></td>
+                <td>{{ movement.operation_date|date:"d/m/Y" }}</td>
+                <td>{{ movement.get_movement_type_display }}</td>
+                <td>{{ movement.from_location.name }}</td>
+                <td>{{ movement.to_location.name }}</td>
+                <td>{{ movement.lines.count }}</td>
+                <td>{{ movement.total_amount|fmt_amount }}</td>
+                <td><a class="button secondary" href="{% url 'internal_movement_pdf' movement.id %}">PDF</a></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8">Aucun bordereau interne pour cet exercice.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if movements.paginator.num_pages > 1 %}
+    <div class="pagination" style="margin-top: 1rem; display: flex; gap: 0.4rem; flex-wrap: wrap;">
+        {% if movements.has_previous %}
+        <a class="button secondary" href="?{{ query_without_page }}&page={{ movements.previous_page_number }}">Précédent</a>
+        {% endif %}
+        <span style="padding: 0.4rem 0.7rem; border: 1px solid var(--border); border-radius: 8px;">
+            Page {{ movements.number }} / {{ movements.paginator.num_pages }}
+        </span>
+        {% if movements.has_next %}
+        <a class="button secondary" href="?{{ query_without_page }}&page={{ movements.next_page_number }}">Suivant</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

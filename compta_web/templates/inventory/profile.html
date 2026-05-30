@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="panel narrow">
+    <h2>Mon profil</h2>
+    <p>Role: {{ request.user.profile.get_role_display }}</p>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="button" type="submit">Enregistrer</button>
+    </form>
+</section>
+{% endblock %}

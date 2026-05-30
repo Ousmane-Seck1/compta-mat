@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% load inventory_filters %}
+
+{% block title %}Clôture exercice {{ current_fy.year }}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>Clôture de l'exercice {{ current_fy.year }} — Report vers {{ new_year }}</h2>
+        <a class="button secondary" href="{% url 'final_report' %}">Annuler</a>
+    </div>
+
+    <div style="background: #fff8e1; border-left: 4px solid #f59e0b; padding: 1rem; margin-bottom: 1.5rem;">
+        <strong>Action irréversible.</strong> Cette opération va :
+        <ol style="margin: 0.5rem 0 0 1.2rem;">
+            <li>Clôturer définitivement l'exercice <strong>{{ current_fy.year }}</strong> (is_closed = vrai, plus aucune saisie possible)</li>
+            <li>Créer l'exercice <strong>{{ new_year }}</strong> avec la même nomenclature</li>
+            <li>Générer automatiquement le <strong>Bon N&deg;1 &laquo;&nbsp;Balance d&rsquo;entrée&nbsp;&raquo;</strong> pour l'exercice {{ new_year }} à partir des stocks finaux ci-dessous</li>
+        </ol>
+    </div>
+
+    <p><strong>Service :</strong> {{ structure.code }} — {{ structure.name }}</p>
+    <p><strong>Exercice en cours :</strong> {{ current_fy.year }} ({{ current_fy.start_date }} au {{ current_fy.end_date }})</p>
+    <p><strong>Nouvel exercice :</strong> {{ new_year }}</p>
+
+    <div style="margin-top: 1rem; font-size: 0.9rem; color: var(--muted);">
+        <strong>Aide :</strong> la clôture doit être faite uniquement après validation des écritures et des écarts de recensement.
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h3>Aperçu — Balance d'entrée (Bon N&deg;1 de {{ new_year }})</h3>
+    </div>
+
+    <div style="margin-bottom: 1rem; padding: 0.8rem; border: 1px solid var(--border); border-radius: 10px; background: #fffdf8;">
+        <strong>Checklist obligatoire avant clôture</strong>
+        <ul style="margin: 0.6rem 0 0 1rem; padding: 0;">
+            <li>Au moins une matière dans l'exercice : {% if checklist.has_materials %}<strong style="color: #116149;">OK</strong>{% else %}<strong style="color: #9c2f2f;">NON</strong>{% endif %}</li>
+            <li>PV renseigné pour toutes les matières : {% if checklist.all_pv_filled %}<strong style="color: #116149;">OK</strong>{% else %}<strong style="color: #9c2f2f;">NON</strong>{% endif %}</li>
+            <li>Aucun stock comptable négatif : {% if checklist.no_negative_stock %}<strong style="color: #116149;">OK</strong>{% else %}<strong style="color: #9c2f2f;">NON</strong>{% endif %}</li>
+        </ul>
+    </div>
+
+    {% if preview_rows %}
+    <table>
+        <thead>
+            <tr>
+                <th>Compte matières</th>
+                <th>Désignation</th>
+                <th>Unité</th>
+                <th>Qté finale reportée</th>
+                <th>CMUP</th>
+                <th>Valeur du stock</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in preview_rows %}
+            <tr {% if row.final_qty == 0 %}style="color: var(--muted);"{% endif %}>
+                <td><strong>{{ row.account_code }}</strong></td>
+                <td>{{ row.name }}</td>
+                <td>{{ row.unit }}</td>
+                <td>{{ row.final_qty|fmt_qty }}</td>
+                <td>{{ row.cmup|fmt_amount }}</td>
+                <td><strong>{{ row.valeur|fmt_amount }}</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3"><strong>Total</strong></td>
+                <td><strong>{{ total_qty|fmt_qty }}</strong></td>
+                <td></td>
+                <td><strong>{{ total_amount|fmt_amount }}</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+    {% else %}
+    <p>Aucune matière avec un stock final positif. Le bon N&deg;1 ne sera pas créé.</p>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <form method="post">
+        {% csrf_token %}
+        <p>En confirmant, l'exercice {{ current_fy.year }} sera clôturé et le Bon N&deg;1 de l'exercice {{ new_year }} sera créé.</p>
+        {% if not checklist_ok %}
+        <p style="color: #9c2f2f;"><strong>Clôture bloquée :</strong> veuillez satisfaire toute la checklist ci-dessus.</p>
+        {% endif %}
+        <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
+            <button class="button" type="submit" style="background: #dc2626;"{% if not checklist_ok %} disabled{% endif %}>
+                Confirmer la clôture et reporter la balance vers {{ new_year }}
+            </button>
+            <a class="button secondary" href="{% url 'final_report' %}">Annuler</a>
+        </div>
+    </form>
+</section>
+{% endblock %}
