@@ -1,8 +1,8 @@
 # Application de comptabilite des matieres
 
-Le projet inclut maintenant une application web Django, plus adaptee a la gestion multi-utilisateur, a l'authentification et a l'impression des bons.
+Application web Django pour la gestion des matieres: bons, inventaires, mouvements internes, PV et reporting.
 
-## Fonctionnalites
+## Fonctionnalites principales
 
 - gestion de la nomenclature des matieres
 - creation de bons d'entree, de sortie definitive et de sortie provisoire
@@ -14,6 +14,78 @@ Le projet inclut maintenant une application web Django, plus adaptee a la gestio
 - releve recapitulatif avec inventaire physique
 - ecran documents (televersement/telechargement des modeles officiels)
 - authentification Django avec profils utilisateurs
+
+## Guide utilisateur (vue d'ensemble)
+
+Cette section decrit les ecrans et les actions usuelles. Ajoute tes captures d'ecran aux emplacements indiques.
+
+### Acces et selection du contexte
+
+- Connexion via l'ecran d'authentification.
+- Choisir le service et l'exercice si necessaire.
+- Acces aux 4 ecrans principaux via le menu.
+
+Capture a ajouter: ecran de connexion.
+
+### Ecran 1 - Administration
+
+- Gestion des utilisateurs et profils.
+- Parametres globaux et par structure.
+- Rapport central et consolidation trimestrielle (admin).
+
+Capture a ajouter: ecran Administration.
+
+### Ecran 2 - Operations comptables
+
+- Creation des bons (entree, sortie definitive, sortie provisoire).
+- Livre-journal et grand livre.
+- Releve recapitulatif et PV de recensement.
+- Cloture d'exercice et report.
+
+Capture a ajouter: ecran Operations.
+
+### Ecran 3 - Mouvements internes
+
+- Localisations et responsables.
+- Bordereaux internes (affectation, mutation, desaffectation).
+- Inventaire individuel contradictoire par localisation.
+
+Capture a ajouter: ecran Mouvements internes.
+
+### Ecran 4 - Modeles de documents
+
+- Televersement/telechargement des modeles officiels.
+- Suivi des controles de securite documents.
+
+Capture a ajouter: ecran Documents.
+
+## Flux principaux (pas a pas)
+
+### 1) Creer un bon d'entree
+
+1. Aller sur l'ecran Operations comptables.
+2. Cliquer sur "Nouveau bon".
+3. Choisir "Entree", renseigner la date, la provenance et les lignes.
+4. Enregistrer puis imprimer si besoin.
+
+### 2) Creer un bon de sortie
+
+1. Aller sur l'ecran Operations comptables.
+2. Choisir "Sortie definitive" ou "Sortie provisoire".
+3. Renseigner les lignes, enregistrer, puis imprimer.
+
+### 3) Realiser un mouvement interne
+
+1. Aller sur l'ecran Mouvements internes.
+2. Choisir le type (affectation, mutation, desaffectation).
+3. Renseigner les localisations et les lignes.
+
+### 4) Produire un PV de recensement
+
+1. Aller sur l'ecran Operations comptables.
+2. Ouvrir le PV de recensement.
+3. Saisir les quantites physiques puis enregistrer.
+4. Imprimer le PV.
 
 ## Navigation fonctionnelle
 
@@ -159,7 +231,7 @@ Notes techniques:
 - Le cache du rapport central est invalide automatiquement a chaque creation/modification/suppression de bon.
 - Les rejets de documents (extension/MIME/taille/scan) sont traces dans le journal d'audit (entite `DocumentSecurity`).
 
-## Purge automatique des logs de sécurité (Windows)
+## Purge automatique des logs de securite (Windows)
 
 Pour automatiser la purge des logs de sécurité selon la politique de rétention :
 
