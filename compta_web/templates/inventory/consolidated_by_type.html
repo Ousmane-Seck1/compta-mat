@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load inventory_filters %}
+
+{% block title %}Rapport consolide par type de structure{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <h2>Rapport consolide par type de structure</h2>
+    </div>
+
+    <form method="get" class="inline-form" style="margin-top: 1rem;">
+        <div>
+            <label for="type_filter">Type de structure</label>
+            <select name="structure_type" id="type_filter">
+                <option value="">-- Choisir --</option>
+                {% for t in all_types %}
+                <option value="{{ t.pk }}" {% if selected_type and selected_type.pk == t.pk %}selected{% endif %}>
+                    {{ t.code }} - {{ t.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="fiscal_year_filter">Exercice</label>
+            <select name="fiscal_year" id="fiscal_year_filter">
+                {% for fy in all_fiscal_years %}
+                <option value="{{ fy }}" {% if selected_fiscal_year == fy %}selected{% endif %}>
+                    {{ fy }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="button">Afficher</button>
+    </form>
+
+    {% if selected_type %}
+    <p class="no-print" style="margin-top: 1rem;">
+        Type : <strong>{{ selected_type.name }}</strong> &mdash; Exercice : <strong>{{ selected_fiscal_year }}</strong>
+    </p>
+
+    {% if aggregate_data %}
+    <h3 style="margin-top: 1.5rem;">Totaux par structure</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Structure</th>
+                <th>Montant total restant</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in aggregate_data %}
+            <tr>
+                <td>{{ entry.structure.code }}</td>
+                <td>{{ entry.structure.name }}</td>
+                <td class="text-right">{{ entry.total|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="2"><strong>Total</strong></td>
+                <td class="text-right"><strong>{{ grand_total|floatformat:0 }}</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+    {% endif %}
+
+    {% if consolidated_rows %}
+    <h3 style="margin-top: 2rem;">Releve consolide — tous services {{ selected_type.name }}</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Compte</th>
+                <th>Matiere</th>
+                <th>Unite</th>
+                <th>Existant debut</th>
+                <th>Entrees</th>
+                <th>Sorties</th>
+                <th>Qte restante</th>
+                <th>Montant restant</th>
+                <th>CMUP</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in consolidated_rows %}
+            <tr>
+                <td>{{ row.account_code }}</td>
+                <td>{{ row.name }}</td>
+                <td>{{ row.unit }}</td>
+                <td class="text-right">{{ row.qty_in_opening|floatformat:0 }}</td>
+                <td class="text-right">{{ row.qty_in_period|floatformat:0 }}</td>
+                <td class="text-right">{{ row.qty_out|floatformat:0 }}</td>
+                <td class="text-right">{{ row.remaining_qty|floatformat:0 }}</td>
+                <td class="text-right">{{ row.remaining_amount|floatformat:0 }}</td>
+                <td class="text-right">{{ row.cmup|floatformat:0 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="9">Aucune donnee disponible.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="margin-top: 1rem;">Aucune donnee pour ce type de structure et cet exercice.</p>
+    {% endif %}
+
+    {% else %}
+    <p style="margin-top: 1rem;">Selectionnez un type de structure et un exercice pour afficher le rapport.</p>
+    {% endif %}
+</section>
+{% endblock %}
