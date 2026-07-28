@@ -21,32 +21,24 @@ class StructureMiddleware:
             
             # Déterminer la structure courante
             if profile:
-                # Admin voit tous les services
-                if profile.role == "admin":
-                    structure_id = request.session.get("structure_id")
-                    if not structure_id:
-                        # Utiliser la première structure disponible
-                        try:
-                            structure = Structure.objects.filter(is_active=True).first()
-                            if structure:
-                                request.session["structure_id"] = structure.id
-                        except Structure.DoesNotExist:
-                            pass
-                else:
-                    current_structure_id = request.session.get("structure_id")
-                    is_current_allowed = bool(
-                        current_structure_id
-                        and profile.assigned_structures.filter(id=current_structure_id, is_active=True).exists()
-                    )
+                accessible_structures = profile.accessible_structures_qs().order_by("code")
+                current_structure_id = request.session.get("structure_id")
+                is_current_allowed = bool(
+                    current_structure_id and accessible_structures.filter(id=current_structure_id).exists()
+                )
 
-                    # Non-admin: conserver le service choisi s'il est autorisé, sinon appliquer un fallback.
-                    if not is_current_allowed:
-                        if profile.default_structure and profile.default_structure.is_active and profile.assigned_structures.filter(id=profile.default_structure.id, is_active=True).exists():
-                            request.session["structure_id"] = profile.default_structure.id
-                        else:
-                            assigned_active = profile.assigned_structures.filter(is_active=True).order_by("code").first()
-                            if assigned_active:
-                                request.session["structure_id"] = assigned_active.id
+                # Conserver le service choisi s'il est autorise, sinon appliquer un fallback.
+                if not is_current_allowed:
+                    if (
+                        profile.default_structure
+                        and profile.default_structure.is_active
+                        and accessible_structures.filter(id=profile.default_structure.id).exists()
+                    ):
+                        request.session["structure_id"] = profile.default_structure.id
+                    else:
+                        first_allowed = accessible_structures.first()
+                        if first_allowed:
+                            request.session["structure_id"] = first_allowed.id
             
             # Déterminer l'exercice courant
             structure_id = request.session.get("structure_id")

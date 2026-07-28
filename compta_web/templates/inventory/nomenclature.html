@@ -27,6 +27,27 @@
         </button>
     </form>
 
+    <!-- Import button -->
+    <details style="margin-bottom:1.5rem;border:1px solid #ccc;border-radius:4px;padding:0.8rem 1rem;">
+        <summary style="cursor:pointer;font-weight:bold;">Importer depuis un fichier (Excel / Word / CSV)</summary>
+        <div style="margin-top:0.8rem;">
+            <p style="font-size:0.9em;color:#555;">
+                Importez une liste de comptes depuis un fichier <strong>.xlsx</strong>, <strong>.docx</strong> ou <strong>.csv</strong>.<br>
+                La première ligne (ou la première ligne du tableau Word) doit contenir les en-têtes :<br>
+                <code>code_compte</code> &nbsp;|&nbsp; <code>intitule</code> &nbsp;|&nbsp; <code>unite</code> &nbsp;|&nbsp; <code>groupe</code> <em>(optionnel)</em><br>
+                Les comptes existants seront mis à jour ; les nouveaux seront créés dans le référentiel.<br>
+                <strong>Après vérification</strong>, utilisez le bouton <em>Synchroniser vers tous les services</em> pour propager vers les structures.
+            </p>
+            <form method="post" action="{% url 'nomenclature_import' %}" enctype="multipart/form-data" style="display:flex;gap:0.8rem;align-items:center;flex-wrap:wrap;">
+                {% csrf_token %}
+                <input type="file" name="import_file" accept=".xlsx,.xls,.docx,.csv" required style="flex:1;min-width:200px;">
+                <button class="button" type="submit" onclick="return confirm('Importer et écraser les données existantes pour les codes trouvés dans le fichier ?')">
+                    Lancer l'import
+                </button>
+            </form>
+        </div>
+    </details>
+
     <!-- Search form -->
     <form method="get" class="inline-form no-print">
         <div>

@@ -12,13 +12,13 @@ class Command(BaseCommand):
     help = "Run pre-production checks: backup DB, check, tests, and collectstatic."
 
     def add_arguments(self, parser):
-        parser.add_argument("--skip-backup", action="store_true", help="Skip SQLite backup step.")
+        parser.add_argument("--skip-backup", action="store_true", help="Skip database backup step.")
         parser.add_argument("--skip-tests", action="store_true", help="Skip test execution.")
         parser.add_argument("--skip-collectstatic", action="store_true", help="Skip collectstatic.")
 
     def handle(self, *args, **options):
         if not options.get("skip_backup"):
-            self._backup_sqlite_database()
+            self._backup_database()
 
         self.stdout.write(self.style.NOTICE("[1/3] Running Django checks..."))
         call_command("check")
@@ -37,7 +37,12 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Pre-production checks completed successfully."))
 
-    def _backup_sqlite_database(self) -> None:
+    def _backup_database(self) -> None:
+        engine = settings.DATABASES["default"].get("ENGINE", "")
+        if engine != "django.db.backends.sqlite3":
+            self.stdout.write(self.style.WARNING("Database backup step is only implemented for SQLite; skipped."))
+            return
+
         db_path = Path(str(settings.DATABASES["default"]["NAME"]))
         if not db_path.exists():
             self.stdout.write(self.style.WARNING("SQLite database file not found; backup skipped."))

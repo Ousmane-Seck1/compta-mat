@@ -44,6 +44,8 @@
             <tr>
                 <th>Utilisateur</th>
                 <th>Rôle</th>
+                <th>Portee</th>
+                <th>Categorie</th>
                 <th>Etat</th>
                 <th>Service par défaut</th>
                 <th>Services autorisés</th>
@@ -55,14 +57,22 @@
             <tr>
                 <td>{{ u.username }}</td>
                 <td>{{ u.profile.get_role_display }}</td>
+                <td>{{ u.profile.get_access_scope_display }}</td>
+                <td>{% if u.profile.assigned_structure_type %}{{ u.profile.assigned_structure_type.code }} - {{ u.profile.assigned_structure_type.name }}{% else %}-{% endif %}</td>
                 <td>{% if u.is_active %}Actif{% else %}Inactif{% endif %}</td>
                 <td>{% if u.profile.default_structure %}{{ u.profile.default_structure.code }}{% else %}-{% endif %}</td>
                 <td>
-                    {% for s in u.profile.assigned_structures.all %}
-                        {{ s.code }}{% if not forloop.last %}, {% endif %}
-                    {% empty %}
-                        -
-                    {% endfor %}
+                    {% if u.is_superuser %}
+                        Tous les services (superuser)
+                    {% elif u.profile.access_scope == 'categorie' and u.profile.assigned_structure_type %}
+                        Tous les services de la categorie {{ u.profile.assigned_structure_type.code }}
+                    {% else %}
+                        {% for s in u.profile.assigned_structures.all %}
+                            {{ s.code }}{% if not forloop.last %}, {% endif %}
+                        {% empty %}
+                            -
+                        {% endfor %}
+                    {% endif %}
                 </td>
                 <td>
                     <a class="button secondary" href="{% url 'user_management' %}?edit={{ u.id }}">Modifier</a>
@@ -76,7 +86,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="6">Aucun utilisateur.</td>
+                <td colspan="8">Aucun utilisateur.</td>
             </tr>
             {% endfor %}
         </tbody>

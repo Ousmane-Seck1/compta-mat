@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
 from django.forms import ModelForm
 
-from .models import InternalMovement, Location, Material, NomenclatureItem, PhysicalInventory, Structure, UserProfile, Voucher
+from .models import InternalMovement, Location, Material, NomenclatureItem, PhysicalInventory, Structure, StructureType, UserProfile, Voucher
 
 
 User = get_user_model()
@@ -18,6 +18,11 @@ VOUCHER_TYPE_CHOICES = [
     (Voucher.TYPE_ENTRY, "Bon d'entree"),
     (Voucher.TYPE_FINAL_EXIT, "Bon de sortie definitive"),
     (Voucher.TYPE_TEMP_EXIT, "Bon de sortie provisoire"),
+]
+
+USER_MANAGED_ACCESS_SCOPE_CHOICES = [
+    (UserProfile.ACCESS_SCOPE_SERVICE, "Un service donne uniquement"),
+    (UserProfile.ACCESS_SCOPE_CATEGORY, "Tous les services d'une meme categorie"),
 ]
 
 
@@ -253,6 +258,16 @@ class ProfileForm(ModelForm):
 
 class UserCreationWithProfileForm(UserCreationForm):
     role = forms.ChoiceField(label="Role", choices=UserProfile.ROLE_CHOICES, initial=UserProfile.ROLE_VIEWER)
+    access_scope = forms.ChoiceField(
+        label="Portee d'acces",
+        choices=USER_MANAGED_ACCESS_SCOPE_CHOICES,
+        initial=UserProfile.ACCESS_SCOPE_SERVICE,
+    )
+    assigned_structure_type = forms.ModelChoiceField(
+        label="Categorie de services",
+        queryset=StructureType.objects.all().order_by("code"),
+        required=False,
+    )
     display_name = forms.CharField(label="Nom d'affichage", max_length=150, required=False)
     default_structure = forms.ModelChoiceField(
         label="Service par defaut",
@@ -272,14 +287,27 @@ class UserCreationWithProfileForm(UserCreationForm):
     def clean(self):
         cleaned_data = super().clean()
         role = cleaned_data.get("role")
+        access_scope = cleaned_data.get("access_scope")
+        assigned_structure_type = cleaned_data.get("assigned_structure_type")
         assigned_structures = cleaned_data.get("assigned_structures")
         default_structure = cleaned_data.get("default_structure")
 
-        if role != UserProfile.ROLE_ADMIN and not assigned_structures:
+        if access_scope == UserProfile.ACCESS_SCOPE_CATEGORY and not assigned_structure_type:
+            raise forms.ValidationError("Selectionnez une categorie de services pour ce niveau d'acces.")
+
+        if access_scope == UserProfile.ACCESS_SCOPE_SERVICE and not assigned_structures:
             raise forms.ValidationError("Selectionnez au moins un service pour cet utilisateur.")
 
-        if role != UserProfile.ROLE_ADMIN and default_structure and default_structure not in assigned_structures:
+        if access_scope == UserProfile.ACCESS_SCOPE_SERVICE and default_structure and default_structure not in assigned_structures:
             raise forms.ValidationError("Le service par defaut doit faire partie des services autorises.")
+
+        if (
+            access_scope == UserProfile.ACCESS_SCOPE_CATEGORY
+            and assigned_structure_type
+            and default_structure
+            and default_structure.structure_type_id != assigned_structure_type.id
+        ):
+            raise forms.ValidationError("Le service par defaut doit appartenir a la categorie selectionnee.")
 
         return cleaned_data
 
@@ -291,15 +319,27 @@ class UserCreationWithProfileForm(UserCreationForm):
         if commit:
             user.save()
             profile = user.profile
+            access_scope = self.cleaned_data.get("access_scope")
+            assigned_structure_type = self.cleaned_data.get("assigned_structure_type")
             assigned_structures = self.cleaned_data.get("assigned_structures")
             default_structure = self.cleaned_data.get("default_structure")
-            if role != UserProfile.ROLE_ADMIN and not default_structure and assigned_structures:
+            if access_scope == UserProfile.ACCESS_SCOPE_SERVICE and not default_structure and assigned_structures:
                 default_structure = assigned_structures.first()
+            if access_scope == UserProfile.ACCESS_SCOPE_CATEGORY and not default_structure and assigned_structure_type:
+                default_structure = Structure.objects.filter(
+                    is_active=True,
+                    structure_type=assigned_structure_type,
+                ).order_by("code").first()
             profile.role = role
+            profile.access_scope = access_scope
+            profile.assigned_structure_type = assigned_structure_type if access_scope == UserProfile.ACCESS_SCOPE_CATEGORY else None
             profile.display_name = self.cleaned_data.get("display_name", "")
             profile.default_structure = default_structure
             profile.save()
-            profile.assigned_structures.set(assigned_structures)
+            if access_scope == UserProfile.ACCESS_SCOPE_SERVICE:
+                profile.assigned_structures.set(assigned_structures)
+            else:
+                profile.assigned_structures.clear()
 
         return user
 
@@ -307,6 +347,16 @@ class UserCreationWithProfileForm(UserCreationForm):
 class UserUpdateWithProfileForm(forms.Form):
     username = forms.CharField(label="Nom d'utilisateur", max_length=150)
     role = forms.ChoiceField(label="Role", choices=UserProfile.ROLE_CHOICES, initial=UserProfile.ROLE_VIEWER)
+    access_scope = forms.ChoiceField(
+        label="Portee d'acces",
+        choices=USER_MANAGED_ACCESS_SCOPE_CHOICES,
+        initial=UserProfile.ACCESS_SCOPE_SERVICE,
+    )
+    assigned_structure_type = forms.ModelChoiceField(
+        label="Categorie de services",
+        queryset=StructureType.objects.all().order_by("code"),
+        required=False,
+    )
     display_name = forms.CharField(label="Nom d'affichage", max_length=150, required=False)
     default_structure = forms.ModelChoiceField(
         label="Service par defaut",
@@ -330,6 +380,8 @@ class UserUpdateWithProfileForm(forms.Form):
                 {
                     "username": user_instance.username,
                     "role": getattr(profile, "role", UserProfile.ROLE_VIEWER),
+                    "access_scope": getattr(profile, "access_scope", UserProfile.ACCESS_SCOPE_SERVICE),
+                    "assigned_structure_type": getattr(profile, "assigned_structure_type", None),
                     "display_name": getattr(profile, "display_name", ""),
                     "default_structure": getattr(profile, "default_structure", None),
                     "assigned_structures": getattr(profile, "assigned_structures", Structure.objects.none()).all() if profile else Structure.objects.none(),
@@ -351,14 +403,27 @@ class UserUpdateWithProfileForm(forms.Form):
     def clean(self):
         cleaned_data = super().clean()
         role = cleaned_data.get("role")
+        access_scope = cleaned_data.get("access_scope")
+        assigned_structure_type = cleaned_data.get("assigned_structure_type")
         assigned_structures = cleaned_data.get("assigned_structures")
         default_structure = cleaned_data.get("default_structure")
 
-        if role != UserProfile.ROLE_ADMIN and not assigned_structures:
+        if access_scope == UserProfile.ACCESS_SCOPE_CATEGORY and not assigned_structure_type:
+            raise forms.ValidationError("Selectionnez une categorie de services pour ce niveau d'acces.")
+
+        if access_scope == UserProfile.ACCESS_SCOPE_SERVICE and not assigned_structures:
             raise forms.ValidationError("Selectionnez au moins un service pour cet utilisateur.")
 
-        if role != UserProfile.ROLE_ADMIN and default_structure and default_structure not in assigned_structures:
+        if access_scope == UserProfile.ACCESS_SCOPE_SERVICE and default_structure and default_structure not in assigned_structures:
             raise forms.ValidationError("Le service par defaut doit faire partie des services autorises.")
+
+        if (
+            access_scope == UserProfile.ACCESS_SCOPE_CATEGORY
+            and assigned_structure_type
+            and default_structure
+            and default_structure.structure_type_id != assigned_structure_type.id
+        ):
+            raise forms.ValidationError("Le service par defaut doit appartenir a la categorie selectionnee.")
 
         return cleaned_data
 
@@ -368,12 +433,18 @@ class UserUpdateWithProfileForm(forms.Form):
 
         user = self.user_instance
         role = self.cleaned_data["role"]
+        access_scope = self.cleaned_data["access_scope"]
+        assigned_structure_type = self.cleaned_data.get("assigned_structure_type")
         assigned_structures = self.cleaned_data.get("assigned_structures")
         default_structure = self.cleaned_data.get("default_structure")
 
-        if role != UserProfile.ROLE_ADMIN and not default_structure and assigned_structures:
+        if access_scope == UserProfile.ACCESS_SCOPE_SERVICE and not default_structure and assigned_structures:
             default_structure = assigned_structures.first()
-
+        if access_scope == UserProfile.ACCESS_SCOPE_CATEGORY and not default_structure and assigned_structure_type:
+            default_structure = Structure.objects.filter(
+                is_active=True,
+                structure_type=assigned_structure_type,
+            ).order_by("code").first()
         user.username = self.cleaned_data["username"]
         user.is_staff = role == UserProfile.ROLE_ADMIN
         user.is_active = self.cleaned_data.get("is_active", True)
@@ -381,10 +452,15 @@ class UserUpdateWithProfileForm(forms.Form):
 
         profile = user.profile
         profile.role = role
+        profile.access_scope = access_scope
+        profile.assigned_structure_type = assigned_structure_type if access_scope == UserProfile.ACCESS_SCOPE_CATEGORY else None
         profile.display_name = self.cleaned_data.get("display_name", "")
         profile.default_structure = default_structure
         profile.save()
-        profile.assigned_structures.set(assigned_structures)
+        if access_scope == UserProfile.ACCESS_SCOPE_SERVICE:
+            profile.assigned_structures.set(assigned_structures)
+        else:
+            profile.assigned_structures.clear()
         return user
 
 

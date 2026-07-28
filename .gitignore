@@ -5,3 +5,4 @@ data/*.db
 .env
 backups/
 staticfiles/
+compta_web/media/quarterly_reports/

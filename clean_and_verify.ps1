@@ -114,7 +114,9 @@ if (-not (Test-Path ".\manage.py")) {
 }
 Write-Host "manage.py : trouve" -ForegroundColor Green
 
-$DbPath = ".\data\db.sqlite3"
+$DatabaseEngine = $env:DJANGO_DB_ENGINE
+if (-not $DatabaseEngine) { $DatabaseEngine = "django.db.backends.postgresql" }
+$DbPath = if ($DatabaseEngine -eq "django.db.backends.sqlite3") { ".\data\db.sqlite3" } else { $null }
 
 # ── ETAPE 1 : Sauvegarde SQLite ────────────────────────────────────────────────
 
@@ -124,6 +126,10 @@ if ($SkipBackup) {
     Step-SKIP "Sauvegarde SQLite" "option -SkipBackup"
 } else {
     Invoke-Step "Sauvegarde SQLite" -ContinueOnFail {
+        if (-not $DbPath) {
+            Write-Host "   Sauvegarde SQLite ignoree: moteur $DatabaseEngine." -ForegroundColor Yellow
+            return
+        }
         if (-not (Test-Path $DbPath)) {
             throw "Fichier $DbPath introuvable."
         }
@@ -248,6 +254,10 @@ Invoke-Step "migrate --plan (coherence schema)" -ContinueOnFail {
 Write-Header "ETAPE 6 / 8 - Integrite de la base SQLite"
 
 Invoke-Step "PRAGMA quick_check" -ContinueOnFail {
+    if (-not $DbPath) {
+        Write-Host "   Verification SQLite ignoree: moteur $DatabaseEngine." -ForegroundColor Yellow
+        return
+    }
     if (-not (Test-Path $DbPath)) {
         Write-Host "   Base non trouvee, etape ignoree." -ForegroundColor Yellow
         return

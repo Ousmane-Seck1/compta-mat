@@ -14,8 +14,31 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 
+class StructureType(TimeStampedModel):
+    """Categorie de structure : hopital, direction regionale, district sanitaire, etc."""
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "Type de structure"
+        verbose_name_plural = "Types de structure"
+
+    def __str__(self) -> str:
+        return f"{self.code} - {self.name}"
+
+
 class Structure(TimeStampedModel):
-    """Service, district sanitaire ou centre de responsabilité."""
+    """Service, district sanitaire ou centre de responsabilite."""
+    structure_type = models.ForeignKey(
+        StructureType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="structures",
+        verbose_name="Type de structure",
+    )
     name = models.CharField(max_length=255, unique=True)
     code = models.CharField(max_length=50, unique=True)
     region = models.CharField(max_length=255, blank=True)
@@ -65,19 +88,34 @@ class SiteSetting(models.Model):
 
 
 class NomenclatureItem(TimeStampedModel):
-    """Referentiel global des comptes de matieres, gere par l'admin uniquement."""
-    account_code = models.CharField(max_length=20, unique=True)
+    """Referentiel des comptes de matieres.
+
+    Si structure_type est null, l'item est commun a tous les types de structure.
+    Sinon, il n'appartient qu'au type de structure specifie.
+    """
+    structure_type = models.ForeignKey(
+        StructureType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="nomenclature_items",
+        verbose_name="Type de structure",
+        help_text="Laisser vide pour un compte commun a tous les types de structure.",
+    )
+    account_code = models.CharField(max_length=20)
     name = models.CharField(max_length=255)
     unit = models.CharField(max_length=20)
     group_code = models.CharField(max_length=10, blank=True)
 
     class Meta:
         ordering = ["account_code"]
+        unique_together = [("structure_type", "account_code")]
         verbose_name = "Compte de nomenclature"
         verbose_name_plural = "Comptes de nomenclature"
 
     def __str__(self) -> str:
-        return f"{self.account_code} - {self.name}"
+        type_label = self.structure_type.code if self.structure_type_id else "*"
+        return f"[{type_label}] {self.account_code} - {self.name}"
 
 
 class Material(TimeStampedModel):
@@ -323,13 +361,35 @@ class UserProfile(TimeStampedModel):
     ROLE_ACCOUNTANT = "comptable"
     ROLE_VIEWER = "consultation"
     ROLE_CHOICES = [
-        (ROLE_ADMIN, "Administrateur (tous les services)"),
+        (ROLE_ADMIN, "Administrateur fonctionnel"),
         (ROLE_ACCOUNTANT, "Comptable matieres"),
         (ROLE_VIEWER, "Consultation"),
+    ]
+    ACCESS_SCOPE_SERVICE = "service"
+    ACCESS_SCOPE_CATEGORY = "categorie"
+    ACCESS_SCOPE_GLOBAL = "global"
+    ACCESS_SCOPE_CHOICES = [
+        (ACCESS_SCOPE_SERVICE, "Un service donne uniquement"),
+        (ACCESS_SCOPE_CATEGORY, "Tous les services d'une meme categorie"),
+        (ACCESS_SCOPE_GLOBAL, "Tous les services (admin global)"),
     ]
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_VIEWER)
+    access_scope = models.CharField(
+        max_length=20,
+        choices=ACCESS_SCOPE_CHOICES,
+        default=ACCESS_SCOPE_SERVICE,
+        help_text="Niveau d'acces aux services.",
+    )
+    assigned_structure_type = models.ForeignKey(
+        StructureType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_user_profiles",
+        help_text="Obligatoire si l'acces est 'categorie'.",
+    )
     display_name = models.CharField(max_length=150, blank=True)
     default_structure = models.ForeignKey(
         Structure,
@@ -353,6 +413,19 @@ class UserProfile(TimeStampedModel):
 
     def __str__(self) -> str:
         return self.display_name or self.user.get_username()
+
+    def accessible_structures_qs(self):
+        """Return active structures accessible by this user profile."""
+        base_qs = Structure.objects.filter(is_active=True)
+        if self.user.is_superuser:
+            return base_qs
+        if self.access_scope == self.ACCESS_SCOPE_GLOBAL:
+            return Structure.objects.none()
+        if self.access_scope == self.ACCESS_SCOPE_CATEGORY:
+            if self.assigned_structure_type_id is None:
+                return Structure.objects.none()
+            return base_qs.filter(structure_type_id=self.assigned_structure_type_id)
+        return self.assigned_structures.filter(is_active=True)
 
 
 class AuditLog(TimeStampedModel):

@@ -799,9 +799,16 @@ def build_location_inventory_report(
 
 @transaction.atomic
 def propagate_nomenclature_add(item: NomenclatureItem) -> int:
-    """Create the corresponding Material in all active structures x open fiscal years."""
+    """Create the corresponding Material in all active structures x open fiscal years.
+
+    If the item has a structure_type, only targets structures of that type.
+    If structure_type is null, targets all active structures (global account).
+    """
     count = 0
-    for structure in Structure.objects.filter(is_active=True):
+    structures_qs = Structure.objects.filter(is_active=True)
+    if item.structure_type_id is not None:
+        structures_qs = structures_qs.filter(structure_type_id=item.structure_type_id)
+    for structure in structures_qs:
         for fy in FiscalYear.objects.filter(structure=structure, is_closed=False):
             _, created = Material.objects.get_or_create(
                 structure=structure,
@@ -826,10 +833,17 @@ def propagate_nomenclature_delete(account_code: str) -> None:
 
 @transaction.atomic
 def sync_all_nomenclature_to_structure(structure: Structure) -> int:
-    """Ensure every NomenclatureItem exists as Material for all open FYs of this structure."""
+    """Ensure every applicable NomenclatureItem exists as Material for all open FYs of this structure.
+
+    Applies global items (structure_type=null) + items matching structure.structure_type.
+    """
+    from django.db.models import Q
     count = 0
+    nomenclature_qs = NomenclatureItem.objects.filter(
+        Q(structure_type__isnull=True) | Q(structure_type=structure.structure_type)
+    )
     for fy in FiscalYear.objects.filter(structure=structure, is_closed=False):
-        for item in NomenclatureItem.objects.all():
+        for item in nomenclature_qs:
             mat, created = Material.objects.get_or_create(
                 structure=structure,
                 fiscal_year=fy,

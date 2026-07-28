@@ -45,7 +45,7 @@ from .forms import (
     VoucherHeaderForm,
     parse_voucher_lines,
 )
-from .models import AuditLog, FiscalYear, InternalMovement, Location, Material, NomenclatureItem, PhysicalInventory, QuarterlyReport, SiteSetting, Structure, UserProfile, Voucher
+from .models import AuditLog, FiscalYear, InternalMovement, Location, Material, NomenclatureItem, PhysicalInventory, QuarterlyReport, SiteSetting, Structure, StructureType, UserProfile, Voucher
 from .services import build_grand_ledger, build_location_inventory_report, carry_forward_to_new_year, compute_stock_summary, create_internal_movement, create_voucher, dashboard_metrics, default_site_context, delete_internal_movement, get_setting, list_internal_movements, next_internal_movement_number, propagate_nomenclature_add, propagate_nomenclature_delete, set_setting, sync_all_nomenclature_to_structure
 
 
@@ -206,20 +206,17 @@ class ServiceAwareLoginView(LoginView):
 
         if profile:
             selected_structure = None
-
-            if profile.role == "admin":
-                structure_id = self.request.session.get("structure_id")
-                if structure_id:
-                    selected_structure = Structure.objects.filter(id=structure_id, is_active=True).first()
-                if not selected_structure:
-                    selected_structure = Structure.objects.filter(is_active=True).order_by("code").first()
-            else:
-                if profile.default_structure and profile.default_structure.is_active:
+            available_structures = profile.accessible_structures_qs().order_by("code")
+            structure_id = self.request.session.get("structure_id")
+            if structure_id:
+                selected_structure = available_structures.filter(id=structure_id).first()
+            if not selected_structure and profile.default_structure and profile.default_structure.is_active:
+                if available_structures.filter(id=profile.default_structure.id).exists():
                     selected_structure = profile.default_structure
-                else:
-                    selected_structure = profile.assigned_structures.filter(is_active=True).order_by("code").first()
+            if not selected_structure:
+                selected_structure = available_structures.first()
 
-            if profile.role != "admin" and selected_structure is None:
+            if selected_structure is None:
                 messages.error(self.request, "Aucun service actif n'est assigne a cet utilisateur.")
                 return response
 
@@ -1270,7 +1267,11 @@ def user_management_view(request: HttpRequest) -> HttpResponse:
             editing_user = get_object_or_404(User, pk=edit_id)
             edit_form = UserUpdateWithProfileForm(user_instance=editing_user)
 
-    users = User.objects.select_related("profile").prefetch_related("profile__assigned_structures").order_by("username")
+    users = User.objects.select_related(
+        "profile",
+        "profile__default_structure",
+        "profile__assigned_structure_type",
+    ).prefetch_related("profile__assigned_structures").order_by("username")
     return render(
         request,
         "inventory/user_management.html",
@@ -1566,6 +1567,233 @@ def nomenclature_admin_view(request: HttpRequest) -> HttpResponse:
             "edit_item": edit_item,
         },
     )
+
+
+@login_required
+def nomenclature_import_view(request: HttpRequest) -> HttpResponse:
+    """Admin-only: import nomenclature items from an Excel (.xlsx), Word (.docx) or CSV file.
+
+    N'effectue PAS de propagation automatique vers les structures.
+    L'administrateur utilise ensuite le bouton 'Synchroniser' pour propager.
+    """
+    if not _is_admin_user(request.user):
+        messages.error(request, "Accès réservé aux administrateurs.")
+        return redirect("nomenclature_admin")
+
+    if request.method != "POST":
+        return redirect("nomenclature_admin")
+
+    uploaded = request.FILES.get("import_file")
+    if not uploaded:
+        messages.error(request, "Aucun fichier sélectionné.")
+        return redirect("nomenclature_admin")
+
+    filename = uploaded.name.lower()
+    rows: list[dict] = []
+
+    try:
+        if filename.endswith(".xlsx") or filename.endswith(".xls"):
+            rows = _parse_nomenclature_excel(uploaded)
+        elif filename.endswith(".docx"):
+            rows = _parse_nomenclature_docx(uploaded)
+        elif filename.endswith(".csv"):
+            rows = _parse_nomenclature_csv(uploaded)
+        else:
+            messages.error(request, "Format non supporté. Utilisez un fichier .xlsx, .docx ou .csv.")
+            return redirect("nomenclature_admin")
+    except Exception as exc:  # noqa: BLE001
+        messages.error(request, f"Erreur lors de la lecture du fichier : {exc}")
+        return redirect("nomenclature_admin")
+
+    if not rows:
+        messages.error(request, "Aucune donnée trouvée dans le fichier. Vérifiez le format.")
+        return redirect("nomenclature_admin")
+
+    created_count = 0
+    updated_count = 0
+    error_count = 0
+
+    for row in rows:
+        code = (row.get("account_code") or "").strip()
+        name = (row.get("name") or "").strip()
+        unit = (row.get("unit") or "").strip()
+        group_code = (row.get("group_code") or "").strip()
+
+        if not code or not name:
+            error_count += 1
+            continue
+
+        _, created = NomenclatureItem.objects.update_or_create(
+            account_code=code,
+            defaults={"name": name, "unit": unit or "U", "group_code": group_code},
+        )
+        if created:
+            created_count += 1
+        else:
+            updated_count += 1
+
+    _audit(
+        request,
+        action=AuditLog.ACTION_CREATE,
+        entity="NomenclatureItem",
+        description=(
+            f"Import nomenclature depuis '{uploaded.name}' : "
+            f"{created_count} créé(s), {updated_count} mis à jour, {error_count} ignoré(s)."
+        ),
+    )
+
+    messages.success(
+        request,
+        f"Import terminé : {created_count} compte(s) créé(s), {updated_count} mis à jour, "
+        f"{error_count} ligne(s) ignorée(s). "
+        "Utilisez 'Synchroniser vers tous les services' pour propager vers les structures.",
+    )
+    return redirect("nomenclature_admin")
+
+
+def _parse_nomenclature_excel(file_obj) -> list[dict]:
+    """Parse un fichier Excel et retourne une liste de dicts avec les colonnes de nomenclature.
+
+    Colonnes attendues (insensible à la casse) :
+      code_compte / compte / account_code
+      intitule / designation / nom / name
+      unite / unit / unité
+      groupe / group_code (optionnel)
+    """
+    import openpyxl  # noqa: PLC0415
+
+    wb = openpyxl.load_workbook(file_obj, data_only=True)
+    ws = wb.active
+
+    rows_iter = ws.iter_rows(values_only=True)
+
+    # Détection des en-têtes sur la première ligne non vide
+    header_row = None
+    data_rows = []
+    for row in rows_iter:
+        if any(cell is not None for cell in row):
+            if header_row is None:
+                header_row = [str(c).strip().lower() if c else "" for c in row]
+            else:
+                data_rows.append(row)
+
+    if not header_row:
+        return []
+
+    def _col(header: list[str], *names: str) -> int | None:
+        for name in names:
+            if name in header:
+                return header.index(name)
+        return None
+
+    idx_code = _col(header_row, "code_compte", "compte", "account_code", "code")
+    idx_name = _col(header_row, "intitule", "intitulé", "designation", "désignation", "nom", "name", "libelle", "libellé")
+    idx_unit = _col(header_row, "unite", "unité", "unit", "u")
+    idx_group = _col(header_row, "groupe", "group_code", "group", "code_groupe")
+
+    if idx_code is None or idx_name is None:
+        raise ValueError(
+            "Colonnes 'code_compte' et 'intitulé' introuvables. "
+            "Assurez-vous que la première ligne contient les en-têtes."
+        )
+
+    result = []
+    for row in data_rows:
+        code = str(row[idx_code]).strip() if row[idx_code] is not None else ""
+        name = str(row[idx_name]).strip() if row[idx_name] is not None else ""
+        unit = str(row[idx_unit]).strip() if idx_unit is not None and row[idx_unit] is not None else ""
+        group = str(row[idx_group]).strip() if idx_group is not None and row[idx_group] is not None else ""
+        if code and name:
+            result.append({"account_code": code, "name": name, "unit": unit, "group_code": group})
+    return result
+
+
+def _parse_nomenclature_docx(file_obj) -> list[dict]:
+    """Parse un fichier Word (.docx) : recherche la première table avec des colonnes de nomenclature.
+
+    La première ligne de la table doit contenir les en-têtes (même noms qu'Excel).
+    """
+    from docx import Document  # noqa: PLC0415
+
+    doc = Document(file_obj)
+
+    if not doc.tables:
+        raise ValueError("Aucun tableau trouvé dans le document Word.")
+
+    # Chercher la table qui contient les colonnes code + nom
+    for table in doc.tables:
+        if not table.rows:
+            continue
+
+        header_cells = [cell.text.strip().lower() for cell in table.rows[0].cells]
+
+        def _col(header: list[str], *names: str) -> int | None:
+            for name in names:
+                if name in header:
+                    return header.index(name)
+            return None
+
+        idx_code = _col(header_cells, "code_compte", "compte", "account_code", "code")
+        idx_name = _col(header_cells, "intitule", "intitulé", "designation", "désignation", "nom", "name", "libelle", "libellé")
+        idx_unit = _col(header_cells, "unite", "unité", "unit", "u")
+        idx_group = _col(header_cells, "groupe", "group_code", "group", "code_groupe")
+
+        if idx_code is None or idx_name is None:
+            continue  # essayer la prochaine table
+
+        result = []
+        for row in table.rows[1:]:
+            cells = row.cells
+            code = cells[idx_code].text.strip() if idx_code < len(cells) else ""
+            name = cells[idx_name].text.strip() if idx_name < len(cells) else ""
+            unit = cells[idx_unit].text.strip() if idx_unit is not None and idx_unit < len(cells) else ""
+            group = cells[idx_group].text.strip() if idx_group is not None and idx_group < len(cells) else ""
+            if code and name:
+                result.append({"account_code": code, "name": name, "unit": unit, "group_code": group})
+        return result
+
+    raise ValueError(
+        "Aucun tableau avec les colonnes 'code_compte' et 'intitulé' trouvé dans le document Word."
+    )
+
+
+def _parse_nomenclature_csv(file_obj) -> list[dict]:
+    """Parse un fichier CSV (séparateur virgule ou point-virgule, encodage UTF-8 ou latin-1)."""
+    import io  # noqa: PLC0415
+
+    raw = file_obj.read()
+    for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            text = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        raise ValueError("Encodage du fichier CSV non reconnu (essayez UTF-8 ou Latin-1).")
+
+    # Détection du séparateur
+    sep = ";" if text.count(";") >= text.count(",") else ","
+
+    reader = csv.DictReader(io.StringIO(text), delimiter=sep)
+    # Normaliser les clés
+    normalized_fieldnames = {k: k.strip().lower() for k in (reader.fieldnames or [])}
+
+    def _resolve(row: dict, *names: str) -> str:
+        for name in names:
+            for original_key, norm_key in normalized_fieldnames.items():
+                if norm_key in names or norm_key == name:
+                    return str(row.get(original_key) or "").strip()
+        return ""
+
+    result = []
+    for row in reader:
+        code = _resolve(row, "code_compte", "compte", "account_code", "code")
+        name = _resolve(row, "intitule", "intitulé", "designation", "désignation", "nom", "name", "libelle", "libellé")
+        unit = _resolve(row, "unite", "unité", "unit", "u")
+        group = _resolve(row, "groupe", "group_code", "group", "code_groupe")
+        if code and name:
+            result.append({"account_code": code, "name": name, "unit": unit, "group_code": group})
+    return result
 
 
 @login_required
@@ -2210,13 +2438,14 @@ def _quarterly_decimal(value: str | int | float | None) -> Decimal:
     return Decimal(str(value))
 
 
-def _get_quarterly_consolidation_data(*, quarter: int, fiscal_year: int) -> dict:
-    reports = list(
-        QuarterlyReport.objects.filter(
-            fiscal_year__year=fiscal_year,
-            quarter=quarter,
-        ).select_related("structure", "fiscal_year")
+def _get_quarterly_consolidation_data(*, quarter: int, fiscal_year: int, structure_type_id: int | None = None) -> dict:
+    reports_qs = QuarterlyReport.objects.filter(
+        fiscal_year__year=fiscal_year,
+        quarter=quarter,
     )
+    if structure_type_id is not None:
+        reports_qs = reports_qs.filter(structure__structure_type_id=structure_type_id)
+    reports = list(reports_qs.select_related("structure", "fiscal_year", "structure__structure_type"))
 
     aggregate_data = []
     aggregate_totals = {
@@ -2329,6 +2558,7 @@ def quarterly_central_recap_view(request: HttpRequest) -> HttpResponse:
 
     quarter_param = request.GET.get("quarter") or "1"
     fiscal_year_param = request.GET.get("fiscal_year")
+    structure_type_param = (request.GET.get("structure_type") or "").strip()
     try:
         quarter = int(quarter_param)
     except ValueError:
@@ -2339,11 +2569,27 @@ def quarterly_central_recap_view(request: HttpRequest) -> HttpResponse:
     all_fiscal_years = list(
         FiscalYear.objects.values_list("year", flat=True).distinct().order_by("-year")
     )
+    all_structure_types = list(StructureType.objects.order_by("code"))
     selected_fiscal_year = int(fiscal_year_param) if fiscal_year_param else (all_fiscal_years[0] if all_fiscal_years else None)
+    selected_structure_type_id: int | None = None
+    if structure_type_param:
+        try:
+            selected_structure_type_id = int(structure_type_param)
+        except ValueError:
+            selected_structure_type_id = None
+    selected_structure_type = None
+    if selected_structure_type_id is not None:
+        selected_structure_type = next((t for t in all_structure_types if t.id == selected_structure_type_id), None)
+        if selected_structure_type is None:
+            selected_structure_type_id = None
 
     data = {"aggregate_data": [], "aggregate_totals": {}, "consolidated_rows": []}
     if selected_fiscal_year is not None:
-        data = _get_quarterly_consolidation_data(quarter=quarter, fiscal_year=selected_fiscal_year)
+        data = _get_quarterly_consolidation_data(
+            quarter=quarter,
+            fiscal_year=selected_fiscal_year,
+            structure_type_id=selected_structure_type_id,
+        )
 
     return render(
         request,
@@ -2353,8 +2599,11 @@ def quarterly_central_recap_view(request: HttpRequest) -> HttpResponse:
             "aggregate_totals": data["aggregate_totals"],
             "consolidated_rows": data["consolidated_rows"],
             "all_fiscal_years": all_fiscal_years,
+            "all_structure_types": all_structure_types,
             "selected_fiscal_year": selected_fiscal_year,
             "selected_quarter": quarter,
+            "selected_structure_type_id": selected_structure_type_id,
+            "selected_structure_type": selected_structure_type,
         },
     )
 
@@ -2371,6 +2620,7 @@ def quarterly_central_recap_excel_view(request: HttpRequest) -> HttpResponse:
 
     quarter_param = request.GET.get("quarter") or "1"
     fiscal_year_param = request.GET.get("fiscal_year")
+    structure_type_param = (request.GET.get("structure_type") or "").strip()
     try:
         quarter = int(quarter_param)
     except ValueError:
@@ -2380,7 +2630,20 @@ def quarterly_central_recap_excel_view(request: HttpRequest) -> HttpResponse:
     if not fiscal_year_param:
         return HttpResponse("Exercice non selectionne.", status=400, content_type="text/plain; charset=utf-8")
 
-    data = _get_quarterly_consolidation_data(quarter=quarter, fiscal_year=int(fiscal_year_param))
+    structure_type_id: int | None = None
+    selected_structure_type = None
+    if structure_type_param:
+        try:
+            structure_type_id = int(structure_type_param)
+            selected_structure_type = StructureType.objects.filter(id=structure_type_id).first()
+        except ValueError:
+            structure_type_id = None
+
+    data = _get_quarterly_consolidation_data(
+        quarter=quarter,
+        fiscal_year=int(fiscal_year_param),
+        structure_type_id=structure_type_id,
+    )
     headers = [
         "Compte",
         "Matiere",
@@ -2416,7 +2679,10 @@ def quarterly_central_recap_excel_view(request: HttpRequest) -> HttpResponse:
         headers=headers,
         rows=rows,
         filename=f"consolidation_trimestrielle_T{quarter}.xlsx",
-        context_lines=[f"Exercice : {fiscal_year_param}"],
+        context_lines=[
+            f"Exercice : {fiscal_year_param}",
+            f"Type de service : {selected_structure_type.code} - {selected_structure_type.name}" if selected_structure_type else "Type de service : Tous",
+        ],
     )
 
 
@@ -2432,6 +2698,7 @@ def quarterly_central_recap_pdf_view(request: HttpRequest) -> HttpResponse:
 
     quarter_param = request.GET.get("quarter") or "1"
     fiscal_year_param = request.GET.get("fiscal_year")
+    structure_type_param = (request.GET.get("structure_type") or "").strip()
     try:
         quarter = int(quarter_param)
     except ValueError:
@@ -2441,7 +2708,20 @@ def quarterly_central_recap_pdf_view(request: HttpRequest) -> HttpResponse:
     if not fiscal_year_param:
         return HttpResponse("Exercice non selectionne.", status=400, content_type="text/plain; charset=utf-8")
 
-    data = _get_quarterly_consolidation_data(quarter=quarter, fiscal_year=int(fiscal_year_param))
+    structure_type_id: int | None = None
+    selected_structure_type = None
+    if structure_type_param:
+        try:
+            structure_type_id = int(structure_type_param)
+            selected_structure_type = StructureType.objects.filter(id=structure_type_id).first()
+        except ValueError:
+            structure_type_id = None
+
+    data = _get_quarterly_consolidation_data(
+        quarter=quarter,
+        fiscal_year=int(fiscal_year_param),
+        structure_type_id=structure_type_id,
+    )
     headers = [
         "Compte",
         "Matiere",
@@ -2478,10 +2758,119 @@ def quarterly_central_recap_pdf_view(request: HttpRequest) -> HttpResponse:
         rows=rows,
         filename=f"consolidation_trimestrielle_T{quarter}.pdf",
         signatures=["Ordonnateur des matieres", "Comptable des matieres"],
-        context_lines=[f"Exercice : {fiscal_year_param}"],
+        context_lines=[
+            f"Exercice : {fiscal_year_param}",
+            f"Type de service : {selected_structure_type.code} - {selected_structure_type.name}" if selected_structure_type else "Type de service : Tous",
+        ],
         document_ref="Modele 19",
         subtitle="Consolidation des releves trimestriels",
         logo_path=_pdf_logo_path(request),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Rapport consolide par type de structure
+# ---------------------------------------------------------------------------
+
+def _get_consolidation_by_type_data(*, structure_type_id: int, fiscal_year: int) -> dict:
+    """Aggregation du releve recapitulatif par type de structure et exercice."""
+    from .services import compute_stock_summary
+
+    structures = Structure.objects.filter(structure_type_id=structure_type_id, is_active=True)
+    rows_by_account: dict = {}
+    aggregate_data = []
+
+    for structure in structures:
+        try:
+            fy = FiscalYear.objects.get(structure=structure, year=fiscal_year)
+        except FiscalYear.DoesNotExist:
+            continue
+        summary = compute_stock_summary(structure=structure, fiscal_year=fy)
+        structure_total = Decimal("0")
+        for row in summary:
+            code = row.account_code
+            if not code:
+                continue
+            item = rows_by_account.get(code)
+            if item is None:
+                item = {
+                    "account_code": code,
+                    "name": row.material_name,
+                    "unit": row.unit,
+                    "qty_in_opening": Decimal("0"),
+                    "qty_in_period": Decimal("0"),
+                    "qty_out": Decimal("0"),
+                    "remaining_qty": Decimal("0"),
+                    "remaining_amount": Decimal("0"),
+                }
+                rows_by_account[code] = item
+            item["qty_in_opening"] += row.qty_in_opening
+            item["qty_in_period"] += row.qty_in_period
+            item["qty_out"] += row.qty_out
+            item["remaining_qty"] += row.remaining_qty
+            item["remaining_amount"] += row.remaining_amount
+            structure_total += row.remaining_amount
+        aggregate_data.append({"structure": structure, "total": structure_total})
+
+    consolidated = []
+    grand_total = Decimal("0")
+    for item in sorted(rows_by_account.values(), key=lambda r: r["account_code"]):
+        remaining_qty = item["remaining_qty"]
+        remaining_amount = item["remaining_amount"]
+        cmup = remaining_amount / remaining_qty if remaining_qty > Decimal("0") else Decimal("0")
+        consolidated.append({**item, "cmup": cmup})
+        grand_total += remaining_amount
+
+    return {
+        "aggregate_data": aggregate_data,
+        "consolidated_rows": consolidated,
+        "grand_total": grand_total,
+    }
+
+
+@login_required
+def consolidated_by_type_view(request: HttpRequest) -> HttpResponse:
+    profile = _get_or_create_profile(request.user)
+    if profile is None or profile.role != "admin":
+        messages.error(request, "Acces reserve aux administrateurs.")
+        return redirect("dashboard")
+
+    all_types = StructureType.objects.all()
+    all_fiscal_years = list(
+        FiscalYear.objects.values_list("year", flat=True).distinct().order_by("-year")
+    )
+
+    type_param = request.GET.get("structure_type")
+    fiscal_year_param = request.GET.get("fiscal_year")
+    selected_type = None
+    data = {"aggregate_data": [], "consolidated_rows": [], "grand_total": Decimal("0")}
+
+    if type_param:
+        try:
+            selected_type = StructureType.objects.get(pk=int(type_param))
+        except (StructureType.DoesNotExist, ValueError):
+            selected_type = None
+
+    selected_fiscal_year = int(fiscal_year_param) if fiscal_year_param else (all_fiscal_years[0] if all_fiscal_years else None)
+
+    if selected_type and selected_fiscal_year:
+        data = _get_consolidation_by_type_data(
+            structure_type_id=selected_type.pk,
+            fiscal_year=selected_fiscal_year,
+        )
+
+    return render(
+        request,
+        "inventory/consolidated_by_type.html",
+        {
+            "all_types": all_types,
+            "all_fiscal_years": all_fiscal_years,
+            "selected_type": selected_type,
+            "selected_fiscal_year": selected_fiscal_year,
+            "aggregate_data": data["aggregate_data"],
+            "consolidated_rows": data["consolidated_rows"],
+            "grand_total": data["grand_total"],
+        },
     )
 
 
@@ -3774,11 +4163,8 @@ def select_structure_view(request: HttpRequest) -> HttpResponse:
         return redirect("menu")
     is_superuser = request.user.is_superuser
     
-    # Get available structures
-    if profile.role == "admin" or is_superuser:
-        available_structures = Structure.objects.filter(is_active=True).order_by("code")
-    else:
-        available_structures = profile.assigned_structures.filter(is_active=True).order_by("code")
+    # Get available structures according to profile scope
+    available_structures = profile.accessible_structures_qs().order_by("code")
 
     selected_structure = request.current_structure
     if selected_structure and not available_structures.filter(id=selected_structure.id).exists():
@@ -3827,8 +4213,8 @@ def select_structure_view(request: HttpRequest) -> HttpResponse:
         try:
             selected_structure = available_structures.get(id=structure_id)
 
-            # Check permissions (already filtered by available_structures, but explicit for admins too)
-            if profile.role != "admin" and not is_superuser and not profile.assigned_structures.filter(id=structure_id, is_active=True).exists():
+            # Check permissions (already filtered by available_structures, but explicit for safety)
+            if not is_superuser and not available_structures.filter(id=structure_id).exists():
                 messages.error(request, "Vous n'avez pas acces a ce service.")
                 return redirect("select_structure")
             
@@ -3890,7 +4276,18 @@ def central_recap_view(request: HttpRequest) -> HttpResponse:
         return redirect("dashboard")
 
     fiscal_year_param = request.GET.get("fiscal_year")
-    central_data = _get_cached_central_recap_data(fiscal_year=fiscal_year_param)
+    structure_type_param = (request.GET.get("structure_type") or "").strip()
+    structure_type_id: int | None = None
+    if structure_type_param:
+        try:
+            structure_type_id = int(structure_type_param)
+        except ValueError:
+            structure_type_id = None
+
+    central_data = _get_cached_central_recap_data(
+        fiscal_year=fiscal_year_param,
+        structure_type_id=structure_type_id,
+    )
 
     context = {
         "aggregate_data": central_data["aggregate_data"],
@@ -3898,7 +4295,10 @@ def central_recap_view(request: HttpRequest) -> HttpResponse:
         "ministry_balance_rows": central_data["ministry_balance_rows"],
         "ministry_totals": central_data["ministry_totals"],
         "all_fiscal_years": central_data["all_fiscal_years"],
+        "all_structure_types": central_data["all_structure_types"],
         "selected_fiscal_year": str(central_data["selected_fiscal_year"]) if central_data["selected_fiscal_year"] is not None else "",
+        "selected_structure_type_id": central_data["selected_structure_type_id"],
+        "selected_structure_type": central_data["selected_structure_type"],
         "total_materials": central_data["total_materials"],
         "total_vouchers": central_data["total_vouchers"],
         "total_comptable_value": central_data["total_comptable_value"],
@@ -3919,33 +4319,59 @@ def central_recap_excel_view(request: HttpRequest) -> HttpResponse:
         return redirect("dashboard")
 
     fiscal_year_param = request.GET.get("fiscal_year")
-    central_data = _get_cached_central_recap_data(fiscal_year=fiscal_year_param)
+    structure_type_param = (request.GET.get("structure_type") or "").strip()
+    structure_type_id: int | None = None
+    if structure_type_param:
+        try:
+            structure_type_id = int(structure_type_param)
+        except ValueError:
+            structure_type_id = None
+
+    central_data = _get_cached_central_recap_data(
+        fiscal_year=fiscal_year_param,
+        structure_type_id=structure_type_id,
+    )
 
     return _build_central_excel_response(
         central_data=central_data,
         filename="balance_generale_consolidee_ministere.xlsx",
         fiscal_year_label=str(central_data["selected_fiscal_year"]) if central_data["selected_fiscal_year"] is not None else "N/A",
+        structure_type_label=(
+            f"{central_data['selected_structure_type'].code} - {central_data['selected_structure_type'].name}"
+            if central_data["selected_structure_type"]
+            else "Tous"
+        ),
     )
 
 
-def _get_cached_central_recap_data(*, fiscal_year: str | None) -> dict:
+def _get_cached_central_recap_data(*, fiscal_year: str | None, structure_type_id: int | None) -> dict:
     timeout = int(getattr(settings, "CENTRAL_RECAP_CACHE_TIMEOUT_SECONDS", 60))
     if timeout <= 0:
-        return _build_central_recap_data(fiscal_year=fiscal_year)
+        return _build_central_recap_data(fiscal_year=fiscal_year, structure_type_id=structure_type_id)
 
     cache_version = _get_central_recap_cache_version()
-    cache_key = f"central_recap:v{cache_version}:{fiscal_year or 'auto'}"
+    cache_key = f"central_recap:v{cache_version}:{fiscal_year or 'auto'}:type:{structure_type_id or 'all'}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
-    central_data = _build_central_recap_data(fiscal_year=fiscal_year)
+    central_data = _build_central_recap_data(fiscal_year=fiscal_year, structure_type_id=structure_type_id)
     cache.set(cache_key, central_data, timeout=timeout)
     return central_data
 
 
-def _build_central_recap_data(*, fiscal_year: str | None) -> dict:
-    structures = list(Structure.objects.filter(is_active=True).order_by("code"))
+def _build_central_recap_data(*, fiscal_year: str | None, structure_type_id: int | None) -> dict:
+    structures_qs = Structure.objects.filter(is_active=True)
+    all_structure_types = list(StructureType.objects.order_by("code"))
+    selected_structure_type = None
+    if structure_type_id is not None:
+        structures_qs = structures_qs.filter(structure_type_id=structure_type_id)
+        selected_structure_type = next((t for t in all_structure_types if t.id == structure_type_id), None)
+        if selected_structure_type is None:
+            structure_type_id = None
+            structures_qs = Structure.objects.filter(is_active=True)
+
+    structures = list(structures_qs.order_by("code"))
     aggregate_data = []
     ministry_balance_by_account: dict[str, dict] = {}
 
@@ -4135,7 +4561,10 @@ def _build_central_recap_data(*, fiscal_year: str | None) -> dict:
         "ministry_balance_rows": ministry_balance_rows,
         "ministry_totals": ministry_totals,
         "all_fiscal_years": common_years,
+        "all_structure_types": all_structure_types,
         "selected_fiscal_year": selected_year,
+        "selected_structure_type_id": structure_type_id,
+        "selected_structure_type": selected_structure_type,
         "total_materials": sum((item["materials_count"] for item in aggregate_data), 0),
         "total_vouchers": sum((item["vouchers_count"] for item in aggregate_data), 0),
         "total_comptable_value": sum((item["comptable_value"] for item in aggregate_data), Decimal("0")),
@@ -4149,6 +4578,7 @@ def _build_central_excel_response(
     central_data: dict,
     filename: str,
     fiscal_year_label: str,
+    structure_type_label: str,
 ) -> HttpResponse:
     try:
         from openpyxl import Workbook
@@ -4176,6 +4606,7 @@ def _build_central_excel_response(
     context_lines = [
         "Rapport central ministeriel",
         f"Exercice filtre : {fiscal_year_label}",
+        f"Type de service : {structure_type_label}",
         f"Services consolides : {len(central_data['aggregate_data'])}",
         f"Date d'edition : {date.today().strftime('%d/%m/%Y')}",
     ]

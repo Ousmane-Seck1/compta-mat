@@ -2,6 +2,34 @@
 
 Application web Django pour la gestion des matieres: bons, inventaires, mouvements internes, PV et reporting.
 
+## Captures d'ecran
+
+Apercu rapide des principaux ecrans de l'application.
+
+### Connexion
+
+![Ecran de connexion](docs/screenshots/connexion.png)
+
+### Menu principal
+
+![Menu principal](docs/screenshots/menu-principal.png)
+
+### Administration
+
+![Administration](docs/screenshots/administration.png)
+
+### Operations comptables
+
+![Operations comptables](docs/screenshots/operations.png)
+
+### Mouvements internes
+
+![Mouvements internes](docs/screenshots/mouvements-internes.png)
+
+### Modeles de documents
+
+![Modeles de documents](docs/screenshots/modeles-documents.png)
+
 ## Fonctionnalites principales
 
 - gestion de la nomenclature des matieres
@@ -25,15 +53,11 @@ Cette section decrit les ecrans et les actions usuelles. Ajoute tes captures d'e
 - Choisir le service et l'exercice si necessaire.
 - Acces aux 4 ecrans principaux via le menu.
 
-Capture a ajouter: ecran de connexion.
-
 ### Ecran 1 - Administration
 
 - Gestion des utilisateurs et profils.
 - Parametres globaux et par structure.
 - Rapport central et consolidation trimestrielle (admin).
-
-Capture a ajouter: ecran Administration.
 
 ### Ecran 2 - Operations comptables
 
@@ -42,22 +66,16 @@ Capture a ajouter: ecran Administration.
 - Releve recapitulatif et PV de recensement.
 - Cloture d'exercice et report.
 
-Capture a ajouter: ecran Operations.
-
 ### Ecran 3 - Mouvements internes
 
 - Localisations et responsables.
 - Bordereaux internes (affectation, mutation, desaffectation).
 - Inventaire individuel contradictoire par localisation.
 
-Capture a ajouter: ecran Mouvements internes.
-
 ### Ecran 4 - Modeles de documents
 
 - Televersement/telechargement des modeles officiels.
 - Suivi des controles de securite documents.
-
-Capture a ajouter: ecran Documents.
 
 ## Flux principaux (pas a pas)
 
@@ -98,6 +116,7 @@ Capture a ajouter: ecran Documents.
 
 - Python 3.14+
 - dependances installees via `pip install -r requirements.txt`
+- PostgreSQL 15+ pour l'environnement principal
 
 ## Installation locale
 
@@ -119,15 +138,25 @@ python -m pip install -r requirements.txt
 
 Variables d'environnement (optionnel en dev):
 
+- creer un fichier `.env` a la racine du projet en copiant `.env.example`
+- Django charge automatiquement ce fichier au demarrage
 - `DJANGO_DEBUG` (True/False)
 - `DJANGO_SECRET_KEY` (obligatoire si DEBUG=False)
 - `DJANGO_ALLOWED_HOSTS` (liste separee par des virgules)
+- `DJANGO_DB_ENGINE` (par defaut `django.db.backends.postgresql`)
+- `DJANGO_DB_NAME`, `DJANGO_DB_USER`, `DJANGO_DB_PASSWORD`, `DJANGO_DB_HOST`, `DJANGO_DB_PORT`
 
 Exemples PowerShell:
 
 ```bash
 $env:DJANGO_DEBUG="True"
 $env:DJANGO_ALLOWED_HOSTS="127.0.0.1,localhost"
+$env:DJANGO_DB_ENGINE="django.db.backends.postgresql"
+$env:DJANGO_DB_NAME="compta_matieres"
+$env:DJANGO_DB_USER="postgres"
+$env:DJANGO_DB_PASSWORD="motdepasse"
+$env:DJANGO_DB_HOST="127.0.0.1"
+$env:DJANGO_DB_PORT="5432"
 ```
 
 Exemples Bash:
@@ -152,6 +181,7 @@ L'application est ensuite accessible sur `http://127.0.0.1:8000`.
 - definir `DJANGO_DEBUG=False`
 - definir `DJANGO_SECRET_KEY` (obligatoire en production)
 - definir `DJANGO_ALLOWED_HOSTS`
+- definir les variables PostgreSQL (`DJANGO_DB_ENGINE`, `DJANGO_DB_NAME`, `DJANGO_DB_USER`, `DJANGO_DB_PASSWORD`, `DJANGO_DB_HOST`, `DJANGO_DB_PORT`)
 - collecter les statiques:
 
 ```bash
@@ -172,7 +202,7 @@ Pour executer uniquement les checks Django (sans tests):
 python manage.py quality_check --skip-tests
 ```
 
-Pour une verification pre-production complete (backup SQLite + check + tests + collectstatic):
+Pour une verification pre-production complete (backup base de donnees + check + tests + collectstatic):
 
 ```bash
 python manage.py preprod_check

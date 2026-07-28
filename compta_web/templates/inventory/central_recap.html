@@ -8,7 +8,7 @@
     <div class="panel-head">
         <h2>Balance générale des comptes consolidée</h2>
         <div class="screen-links no-print">
-            <a class="button menu-secondary" href="{% url 'central_recap_excel' %}{% if selected_fiscal_year %}?fiscal_year={{ selected_fiscal_year }}{% endif %}">Exporter Excel</a>
+            <a class="button menu-secondary" href="{% url 'central_recap_excel' %}?fiscal_year={{ selected_fiscal_year }}{% if selected_structure_type_id %}&structure_type={{ selected_structure_type_id }}{% endif %}">Exporter Excel</a>
         </div>
     </div>
 
@@ -21,6 +21,17 @@
                 {% for fy in all_fiscal_years %}
                 <option value="{{ fy }}" {% if selected_fiscal_year == fy|stringformat:"s" %}selected{% endif %}>
                     {{ fy }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="structure_type_filter">Type de service</label>
+            <select name="structure_type" id="structure_type_filter">
+                <option value="">Tous les types</option>
+                {% for st in all_structure_types %}
+                <option value="{{ st.id }}" {% if selected_structure_type_id == st.id %}selected{% endif %}>
+                    {{ st.code }} - {{ st.name }}
                 </option>
                 {% endfor %}
             </select>

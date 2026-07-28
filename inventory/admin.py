@@ -13,6 +13,7 @@ from .models import (
     PhysicalInventory,
     SiteSetting,
     Structure,
+    StructureType,
     UserProfile,
     Voucher,
     VoucherLine,
@@ -34,12 +35,23 @@ class InternalMovementLineInline(admin.TabularInline):
     extra = 0
 
 
+@admin.register(StructureType)
+class StructureTypeAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "description", "structure_count")
+    search_fields = ("code", "name")
+    fields = ("code", "name", "description")
+
+    @admin.display(description="Nb structures")
+    def structure_count(self, obj):
+        return obj.structures.count()
+
+
 @admin.register(Structure)
 class StructureAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "region", "logo", "is_active")
-    list_filter = ("is_active",)
+    list_display = ("code", "name", "structure_type", "region", "is_active")
+    list_filter = ("is_active", "structure_type")
     search_fields = ("code", "name", "region")
-    fields = ("code", "name", "region", "logo", "is_active")
+    fields = ("code", "name", "structure_type", "region", "logo", "is_active")
 
 
 @admin.register(FiscalYear)
@@ -154,15 +166,25 @@ class AuditLogAdmin(admin.ModelAdmin):
 
 @admin.register(NomenclatureItem)
 class NomenclatureItemAdmin(admin.ModelAdmin):
-    list_display = ("account_code", "name", "unit", "group_code")
+    list_display = ("account_code", "name", "unit", "group_code", "structure_type")
+    list_filter = ("structure_type",)
     search_fields = ("account_code", "name", "group_code")
-    fields = ("account_code", "name", "unit", "group_code")
+    fields = ("structure_type", "account_code", "name", "unit", "group_code")
+    ordering = ("structure_type", "account_code")
 
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "role", "display_name", "default_structure")
-    list_filter = ("role", "default_structure")
+    list_display = ("user", "role", "access_scope", "assigned_structure_type", "display_name", "default_structure")
+    list_filter = ("role", "access_scope", "assigned_structure_type", "default_structure")
     search_fields = ("user__username", "display_name")
-    fields = ("user", "role", "display_name", "default_structure", "assigned_structures")
+    fields = (
+        "user",
+        "role",
+        "access_scope",
+        "assigned_structure_type",
+        "display_name",
+        "default_structure",
+        "assigned_structures",
+    )
     filter_horizontal = ("assigned_structures",)
